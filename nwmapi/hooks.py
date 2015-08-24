@@ -1,17 +1,11 @@
 import falcon
 
-
-def check_context_key(key):
+def validate_uuid():
 
     def hook(req, resp, resource, params):
-        try:
-            value = req.context[key]
-        except KeyError:
-            raise falcon.HTTPBadRequest(
-                falcon.HTTP_BAD_REQUEST,
-                'The request could not be understood by the server due to malformed syntax. '
-                'The client SHOULD NOT repeat the request without modifications. (RFC 2616)'
-            )
+        id = params['id']
+        if len(id) != 32:
+            raise falcon.HTTPInvalidParam('The "id" needs to be 32 characters in length', 'id')
 
     return hook
 

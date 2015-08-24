@@ -1,5 +1,6 @@
 import logging
 import falcon
+import re
 
 log = logging.getLogger(__name__)
 
@@ -31,12 +32,20 @@ log = logging.getLogger(__name__)
 # or modify `resp` manually in order to communicate
 # information about the issue to the client.
 def handle_server_error(ex, req, resp, params):
+    log.exception(ex)
     http_error = ex
 
     if not isinstance(ex, falcon.HTTPError):
-        http_error = falcon.HTTPInternalServerError(falcon.HTTP_500, ex.message)
+        http_error = falcon.HTTPInternalServerError(falcon.HTTP_500, '{} {}'.format(type(ex), ex.message))
 
     raise http_error
+
+
+def raise_bad_request(req, resp):
+    log.error('raise_unknown_resource: %s %s %s', req.protocol.upper(), req.method, req.relative_uri)
+    raise falcon.HTTPBadRequest(title='Unknown Resource',
+                                description='No handler found for this url resource')
+
 
 
 # def _getattr(obj, attr_name, default_value=None):
@@ -44,40 +53,49 @@ def handle_server_error(ex, req, resp, params):
 #         return getattr(obj, attr_name)
 #     return default_value
 
-#
-# class RootHandler(object):
-#
-#     def on_options(self, req, resp):
-#         respondJson(resp, falcon.HTTP_204, jsonSuccess())
-#
-#
-# class NoMethod(RootHandler):
-#
-#     def on_get(self, req, resp):
-#         respondJson(resp, falcon.HTTP_400, jsonError('No method in url.'))
-#
-#
-# class UnknownMethod(RootHandler):
-#
-#     def on_get(self, req, resp, method):
-#         respondJson(resp,
-#                     falcon.HTTP_400,
-#                     jsonError('Unknown method {0!r} in url.'.format(method)))
-#
-#
-# def raise_unknown_url(req, resp):
-#     raise UnknownURL()
-#
-#
-# def jsonSuccess(*args, **kwargs):
-#     return formatXML(Elt('success', *args, **kwargs))
-#
-#
-# def jsonError(msg):
-#     return formatXML(Elt('error', attrib={'reason': msg}))
-#
-#
-# def respondJson(resp, status, body):
-#     resp.content_type = 'application/xml; charset=utf-8'
-#     resp.status = status
-#     resp.body = body
+
+
+def _HTTPError_to_dict(self, obj_type=dict):
+    """Returns a basic dictionary representing the error.
+
+    This method can be useful when serializing the error to hash-like
+    media types, such as YAML, JSON, and MessagePack.
+
+    Args:
+        obj_type: A dict-like type that will be used to store the
+            error information (default ``dict``).
+
+    Returns:
+        A dictionary populated with the error's title, description, etc.
+
+    """
+
+    assert self.has_representation
+
+    obj = obj_type()
+
+    if self.status is not None:
+        try:
+            try:
+                obj['status'] = int(re.findall(r'^\d+', self.status)[0])
+            except:
+                obj['status'] = int(self.status)
+        except:
+            obj['status'] = self.status
+
+    if self.title is not None:
+        obj['title'] = self.title
+
+    if self.description is not None:
+        obj['description'] = self.description
+
+    if self.code is not None:
+        obj['code'] = self.code
+
+    if self.link is not None:
+        obj['link'] = self.link
+
+    return obj
+
+# Monkey patch to_dict to include 'status' attribute
+falcon.HTTPError.to_dict = _HTTPError_to_dict

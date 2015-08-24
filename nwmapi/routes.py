@@ -1,9 +1,13 @@
 import falcon
 from nwmapi import UserResource
-from nwmapi.errors import handle_server_error
+from nwmapi.errors import handle_server_error, raise_bad_request
+from nwmapi.resources import BadRequest
+from nwmapi.resources.users import UsersResource
+
 
 def add_routes(app):
-    users = UserResource()
+    user = UserResource()
+    users = UsersResource()
 
     # The router treats URI paths as a tree of URI segments and searches by
     # checking the URI one segment at a time. Instead of interpreting the route
@@ -30,10 +34,11 @@ def add_routes(app):
     #   /foo/{name}/bar
     #
 
-    # app.add_sink(raise_unknown_url)
-    # app.add_route('/', NoMethod())
-    # app.add_route('/{method}', UnknownMethod())
+    app.add_sink(raise_bad_request)
+    app.add_route('/', BadRequest())
+    app.add_route('/{method}', BadRequest())
 
+    app.add_route('/users/{id}', user)
     app.add_route('/users', users)
 
     # If a responder ever raised an instance of Exception, pass control to the given handler.

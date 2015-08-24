@@ -5,6 +5,18 @@ from nwmapi.resources.users import UserResource
 from nwmapi.routes import add_routes
 from sqlalchemy import engine_from_config
 
+def json_error_serializer(req, exception):
+    """Override default serialize to always return json representation
+
+       Args:
+            req: The request object.
+
+        Returns:
+            A ``tuple`` of the form (*media_type*, *representation*), or (``None``, ``None``)
+            if the client does not support any of the available media types.
+    """
+    return 'application/json', exception.to_json()
+
 
 def main(global_config, **settings):
     """ This function returns a WSGI application.
@@ -28,7 +40,10 @@ def main(global_config, **settings):
         middleware=[
             RequestResponseLogger(),
             RequireJSON(),
+            JSONTranslator(),
         ])
+
+    app.set_error_serializer(json_error_serializer)
 
     add_routes(app)
 

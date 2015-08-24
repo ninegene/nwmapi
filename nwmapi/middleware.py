@@ -16,6 +16,7 @@ class RequestResponseLogger(object):
 class RequireJSON(object):
     def process_request(self, req, resp):
         if not req.client_accepts_json:
+            log.error('RequireJSON: req.client_accepts_json is empty')
             raise falcon.HTTPNotAcceptable(
                 'Unsupported response encoding',
                 href='')
@@ -55,3 +56,4 @@ class JSONTranslator(object):
             return
 
         resp.body = json.dumps(req.context['result'])
+
