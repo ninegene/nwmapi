@@ -1,63 +1,35 @@
-from contextlib import contextmanager
 import falcon
-from nwmapi.middleware.auth import RequireAuthToken
-from nwmapi.middleware.contenttype import RequireJSON, JSONTranslator
-from nwmapi.resources.user import UserResource
+from nwmapi.middleware import RequestResponseLogger, RequireJSON, JSONTranslator
+from nwmapi.models import Session, Base
+from nwmapi.resources.users import UserResource
+from nwmapi.routes import add_routes
 from sqlalchemy import engine_from_config
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import scoped_session, sessionmaker
-
-
-BaseModel = declarative_base()
-# establish a constraint naming convention.
-# http://docs.sqlalchemy.org/en/latest/core/constraints.html#configuring-constraint-naming-conventions
-#
-BaseModel.metadata.naming_convention={
-    "pk": "pk_%(table_name)s",
-    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-    "ck": "ck_%(table_name)s_%(constraint_name)s",
-    "uq": "uq_%(table_name)s_%(column_0_name)s",
-    "ix": "ix_%(table_name)s_%(column_0_name)s"
-}
-
-DBSession = scoped_session(sessionmaker(
-    autoflush=True,
-    autocommit=False,
-    expire_on_commit=True))
-
-
-@contextmanager
-def dbsession_scope():
-    """Provide a transactional scope around a series of operations."""
-    session = DBSession()
-    try:
-        yield session
-        session.commit()
-    except:
-        session.rollback()
-        raise
-    finally:
-        session.close()
 
 
 def main(global_config, **settings):
     """ This function returns a WSGI application.
     """
-    settings = {'sqlalchemy.url': 'sqlite:///nwmdb.sqlite', 'apiversion': '1'}
     engine = engine_from_config(settings, 'sqlalchemy.')
-    DBSession.configure(bind=engine)
-    BaseModel.metadata.bind = engine
+    Session.configure(bind=engine)
+    Base.metadata.bind = engine
 
     # Configure WSGI server (app is a WSGI callable)
-    app = falcon.API(middleware=[
-        RequireAuthToken(),
-        RequireJSON(),
-        JSONTranslator()
-    ])
+    app = falcon.API(
+        # media type to use as the value for the Content-Type header on responses
+        media_type='application/json; charset=utf-8',
 
-    user = UserResource()
+        # Middleware components provide a way to execute logic before the framework routes each request,
+        # after each request is routed but before the target responder is called, or just before the
+        # response is returned for each request. Middleware component's methods (e.g. process_request)
+        # are executed hierarchically, as a stack, following the ordering of the list. If one of the
+        # process_request middleware methods raises an error, it will be processed according
+        # to the error type. If the type matches a registered error handler, that handler will be invoked
+        # and then the framework will begin to unwind the stack, skipping any lower layers.
+        middleware=[
+            RequestResponseLogger(),
+            RequireJSON(),
+        ])
 
-    api_version = '/api/' + settings['apiversion']
-    app.add_route(api_version + '/user', user)
+    add_routes(app)
 
     return app
