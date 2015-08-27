@@ -1,9 +1,11 @@
-import os
 import ConfigParser as configparser
 from logging.config import fileConfig
+
+import os
 from paste.deploy import (
     appconfig,
 )
+
 
 # Taken from pyramid framework <pyramid/scripts/common.py>
 def parse_vars(args):
@@ -51,7 +53,6 @@ def _getpathsec(config_uri, name):
     if name:
         section = name
     return path, section
-
 
 
 def get_appsettings(config_uri, name=None, options=None, appconfig=appconfig):

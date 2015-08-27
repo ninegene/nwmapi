@@ -1,8 +1,33 @@
+import logging
+
 import falcon
 from nwmapi import UserResource
-from nwmapi.errors import handle_server_error, raise_bad_request
-from nwmapi.resources import BadRequest
+from nwmapi.httpstatus import HTTP500InternalServerError, HTTP400BadRequest
 from nwmapi.resources.users import UsersResource
+
+log = logging.getLogger(__name__)
+
+# A handler can either raise an instance of ``HTTPError``
+# or modify `resp` manually in order to communicate
+# information about the issue to the client.
+def handle_server_error(ex, req, resp, params):
+    log.exception(ex)
+    http_error = ex
+
+    if not isinstance(ex, falcon.HTTPError):
+        http_error = HTTP500InternalServerError(title=type(ex), description=str(ex))
+
+    raise http_error
+
+
+class UnknownUrl(object):
+    def on_get(self, req, resp):
+        raise_unknown_url(req, resp)
+
+
+def raise_unknown_url(req, resp):
+    raise HTTP400BadRequest(title='Invalid url',
+                            description='No route handler method defined for the url')
 
 
 def add_routes(app):
@@ -34,9 +59,9 @@ def add_routes(app):
     #   /foo/{name}/bar
     #
 
-    app.add_sink(raise_bad_request)
-    app.add_route('/', BadRequest())
-    app.add_route('/{method}', BadRequest())
+    app.add_sink(raise_unknown_url)
+    app.add_route('/', UnknownUrl())
+    app.add_route('/{method}', UnknownUrl())
 
     app.add_route('/users/{id}', user)
     app.add_route('/users', users)

@@ -1,7 +1,7 @@
 import json
 import logging
-import falcon
 
+import falcon
 
 log = logging.getLogger(__name__)
 
@@ -56,4 +56,3 @@ class JSONTranslator(object):
             return
 
         resp.body = json.dumps(req.context['result'])
-
