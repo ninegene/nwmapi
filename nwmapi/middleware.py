@@ -2,8 +2,10 @@ import json
 import logging
 
 import falcon
+from nwmapi.httpstatus import HTTP400BadRequest, HTTP406NotAcceptable, HTTP415UnsupportedMediaType
 
 log = logging.getLogger(__name__)
+
 
 class RequestResponseLogger(object):
     def process_request(self, req, resp):
@@ -17,15 +19,11 @@ class RequireJSON(object):
     def process_request(self, req, resp):
         if not req.client_accepts_json:
             log.error('RequireJSON: req.client_accepts_json is empty')
-            raise falcon.HTTPNotAcceptable(
-                'Unsupported response encoding',
-                href='')
+            raise HTTP406NotAcceptable('Unsupported response encoding', href='')
 
         if req.method in ('POST', 'PUT'):
             if 'application/json' not in req.content_type:
-                raise falcon.HTTPUnsupportedMediaType(
-                    'Unsupported content type',
-                    href='')
+                raise HTTP415UnsupportedMediaType('Unsupported content type', href='')
 
 
 class JSONTranslator(object):
@@ -40,16 +38,16 @@ class JSONTranslator(object):
 
         body = req.stream.read()
         if not body:
-            raise falcon.HTTPBadRequest('Empty request body',
-                                        'A valid JSON document is required.')
+            raise HTTP400BadRequest('Empty request body',
+                                    'A valid JSON document is required.')
 
         try:
             req.context['doc'] = json.loads(body.decode('utf-8'))
 
         except (ValueError, UnicodeDecodeError):
-            raise falcon.HTTPBadRequest('Malformed JSON',
-                                        'Could not decode the request body. '
-                                        'The JSON was incorrect or not encoded as UTF-8')
+            raise HTTP400BadRequest('Malformed JSON',
+                                    'Could not decode the request body. '
+                                    'The JSON was incorrect or not encoded as UTF-8')
 
     def process_response(self, req, resp, resource):
         if 'result' not in req.context:

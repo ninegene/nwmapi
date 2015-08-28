@@ -30,7 +30,12 @@ Based on:
 * https://stripe.com/docs/api#errors
 * https://www.dropbox.com/developers/core/docs#error-handling
 
+## Learn REST API
+* https://parse.com/docs/rest/guide/
 
+## Auth Example Implementations
+* https://developer.atlassian.com/docs/atlassian-platform-common-components/rest-api-development/rest-and-os_authtype
+* https://developer.gooddata.com/api#/introduction/use-cases
 
 ## Good RESP APIs 
 * https://stripe.com/docs/api

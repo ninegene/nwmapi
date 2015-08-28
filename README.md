@@ -1,6 +1,9 @@
 
 ## Initial Setup
 ```
+# for bcrypt
+sudo apt-get install build-essential libffi-dev python-dev
+
 cd nwmapi
 virtualenv env
 source env/bin/activate.fish

@@ -1,7 +1,7 @@
 from nwmapi import Session, Base
 from nwmapi.models import session_scope
 from nwmapi.models.user import User
-from nwmapi.util.common import parse_vars, setup_logging, get_appsettings
+from nwmapi.common import parse_vars, setup_logging, get_appsettings
 import os
 import sys
 
@@ -24,8 +24,8 @@ def main(argv=sys.argv):
     engine = engine_from_config(settings, 'sqlalchemy.')
     Session.configure(bind=engine)
     Base.metadata.create_all(engine)
-    with session_scope() as db:
-        count = db.query(User).delete()
-        print('deleted %s', count)
-        testuser = User(fullname='Test User', username='testuser', email="testuser@email.com")
-        db.add(testuser)
+    # with session_scope() as db:
+    #     count = db.query(User).delete()
+    #     print('deleted %s', count)
+    #     testuser = User(fullname='Test User', username='testuser', email="testuser@email.com")
+    #     db.add(testuser)

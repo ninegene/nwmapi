@@ -1,5 +1,7 @@
 import ConfigParser as configparser
+import hashlib
 from logging.config import fileConfig
+import random
 
 import os
 from paste.deploy import (
@@ -74,3 +76,17 @@ def get_appsettings(config_uri, name=None, options=None, appconfig=appconfig):
         name=section,
         relative_to=here_dir,
         global_conf=options)
+
+
+def get_random_chars(size):
+    word = ''
+    for i in xrange(size):
+        word += random.choice(('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/&='))
+    return word
+
+
+def gen_api_key():
+    """Generate a 12 char api key for the user to use"""
+    m = hashlib.sha256()
+    m.update(get_random_chars(12))
+    return unicode(m.hexdigest()[:12])
