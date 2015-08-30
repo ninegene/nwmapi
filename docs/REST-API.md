@@ -32,6 +32,7 @@ Based on:
 
 ## Learn REST API
 * https://parse.com/docs/rest/guide/
+* http://www.restapitutorial.com/httpstatuscodes.html
 
 ## Auth Example Implementations
 * https://developer.atlassian.com/docs/atlassian-platform-common-components/rest-api-development/rest-and-os_authtype

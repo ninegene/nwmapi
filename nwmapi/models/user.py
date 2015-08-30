@@ -3,10 +3,11 @@ import uuid
 from datetime import datetime, timedelta
 
 import bcrypt
-from nwmapi.common import gen_api_key
-from nwmapi.models import GUID, Base, CoerceUTF8, session_scope
-from sqlalchemy import Column, DateTime, String, func, ForeignKey, Enum, UnicodeText, Integer
-from sqlalchemy.orm import relationship, backref, synonym
+from dateutil.tz import tzutc
+from nwmapi.common import gen_random_hash
+from nwmapi.models import GUID, Base, CoerceUTF8, UTCDateTime
+from sqlalchemy import Column, String, func, ForeignKey, Enum, UnicodeText, Integer, DateTime
+from sqlalchemy.orm import relationship, synonym
 
 log = logging.getLogger(__name__)
 
@@ -19,12 +20,12 @@ log = logging.getLogger(__name__)
 # http://docs.sqlalchemy.org/en/improve_toc/orm/backref.html
 # Introduction to SQLAlchemy - Pycon 2013 - https://www.youtube.com/watch?v=woKYyhLCcnU
 
-USER_TYPE_CONSUMER = 'consumer'
-USER_TYPE_BUSINESS = 'business'
-USER_TYPE_ADMIN = 'admin'
+USER_ROLE_CONSUMER = 'consumer'
+USER_ROLE_BUSINESS = 'business'
+USER_ROLE_ADMIN = 'admin'
 
 USER_STATUS_ACTIVE = 'active'
-USER_STATUS_NON_ACTIVATED = 'nonactivated'
+USER_STATUS_INACTIVE = 'inactive'
 USER_STATUS_SUSPENDED = 'suspended'
 USER_STATUS_CLOSED = 'closed'
 
@@ -32,8 +33,7 @@ ACTIVATION_AGE = timedelta(days=3)
 NON_ACTIVATION_AGE = timedelta(days=30)
 
 SIGNUP_METHOD_INVITE = 'invite'
-SIGNUP_METHOD_WEB = 'web'
-SIGNUP_METHOD_MOBILE = 'mobile'
+SIGNUP_METHOD_SIGNUP = 'signup'
 SIGNUP_METHOD_TEST = 'test'
 
 
@@ -44,39 +44,32 @@ class User(Base):
     id = Column(GUID, default=uuid.uuid4, primary_key=True)
     username = Column(CoerceUTF8(255), unique=True)
     _password = Column('password', CoerceUTF8(60))
-    email = Column(String(255), unique=True)  # lowercase only?
-    fullname = Column(CoerceUTF8(255), nullable=False)
-    profile_id = Column(GUID, ForeignKey('profile.id'))
-    profile = relationship(
-        "Profile",
-        cascade="all, delete, delete-orphan",
-        single_parent=True,
-        backref=backref("user", uselist=False),
-        lazy='joined'
-    )
-    type = Column(Enum(USER_TYPE_CONSUMER,
-                       USER_TYPE_BUSINESS,
-                       USER_TYPE_ADMIN),
-                  name='user_type',
-                  default=USER_TYPE_CONSUMER)
-    status = Column(Enum(USER_STATUS_ACTIVE,
-                         USER_STATUS_NON_ACTIVATED,
-                         USER_STATUS_SUSPENDED,
-                         USER_STATUS_CLOSED),
-                    name='user_status',
-                    default=USER_STATUS_NON_ACTIVATED)
-    last_login = Column(DateTime, nullable=True)
-    signup = Column(DateTime, default=func.now())
-    api_key = Column(CoerceUTF8(12))
-    invite_ct = Column(Integer, default=0)
-    invited_by = Column('invited_by', CoerceUTF8(255))
+    email = Column(String(255), unique=True)
+    fullname = Column(CoerceUTF8(255))
+    about_me = Column(CoerceUTF8)
+    phone = Column(String)
+    location = Column(CoerceUTF8(255))
+    avatar_hash = Column(String(32))
+    role = Column(
+        Enum(USER_ROLE_CONSUMER,
+             USER_ROLE_BUSINESS,
+             USER_ROLE_ADMIN),
+        default=USER_ROLE_CONSUMER)
+    status = Column(
+        Enum(USER_STATUS_ACTIVE,
+             USER_STATUS_INACTIVE,
+             USER_STATUS_SUSPENDED,
+             USER_STATUS_CLOSED),
+        default=USER_STATUS_INACTIVE)
     activation = relationship(
         'Activation',
         cascade="all, delete, delete-orphan",
         uselist=False,
-        backref='user')
-    created = Column(DateTime, default=func.now())
-    updated = Column(DateTime, server_default=func.now(), onupdate=func.current_timestamp())
+        backref='user',
+        lazy='joined')
+    custom_data = Column(UnicodeText)
+    created = Column(UTCDateTime, default=func.now(tz=tzutc()))
+    updated = Column(UTCDateTime, server_default=func.now(tz=tzutc()), onupdate=func.current_timestamp())
 
     # groups = relationship(
     #     Group,
@@ -86,8 +79,8 @@ class User(Base):
 
     def __init__(self):
         """By default a user starts out deactivated"""
-        self.activation = Activation(u'signup')
-        self.status = USER_STATUS_NON_ACTIVATED
+        self.activation = Activation()
+        self.status = USER_STATUS_INACTIVE
 
     def _set_password(self, password):
         """Hash password on the fly."""
@@ -127,25 +120,15 @@ class User(Base):
         :return: Whether the password is valid.
 
         """
-        # the password might be null as in the case of morpace employees
-        # logging in via ldap. We check for that here and return them as an
-        # incorrect login
         if self.password:
             salt = self.password[:29]
             return self.password == bcrypt.hashpw(password, salt)
         else:
             return False
 
-    def safe_data(self):
-        """Return safe data to be sharing around"""
-        hide = ['_password', 'password', 'is_admin', 'api_key']
-        return dict(
-            [(k, v) for k, v in dict(self).iteritems() if k not in hide]
-        )
-
     def deactivate(self):
         """In case we need to disable the login"""
-        self.status = USER_STATUS_NON_ACTIVATED
+        self.status = USER_STATUS_INACTIVE
 
     def reactivate(self, creator):
         """Put the account through the reactivation process
@@ -155,30 +138,16 @@ class User(Base):
         """
         # if we reactivate then reinit this
         self.activation = Activation(creator)
-        self.status = USER_STATUS_NON_ACTIVATED
+        self.status = USER_STATUS_INACTIVE
 
-    def has_invites(self):
-        """Does the user have any invitations left"""
-        return self.invite_ct > 0
-
-    def __repr__(self):
-        return "<User {} {} {} {}>".format(self.username, self.email, self.type, self.status)
-
-
-class Profile(Base):
-    __tablename__ = u'profile'
-    id = Column(GUID, primary_key=True)
-    about_me = Column(CoerceUTF8)
-    phone = Column(String)
-    location = Column(CoerceUTF8(255))
-    member_since = Column(DateTime, default=func.now())
-    last_seen = Column(DateTime, default=func.now())
-    avatar_hash = Column(String(32))
-    custom_data = Column(UnicodeText)
-    updated = Column(DateTime, server_default=func.now(), onupdate=func.current_timestamp())
+    def to_dict(self, excluded_columns=set()):
+        excluded_columns = excluded_columns | {'password'}
+        result = super(User, self).to_dict(excluded_columns)
+        result['activation'] = self.activation.to_dict(excluded_columns={'user_id'})
+        return result
 
     def __repr__(self):
-        return "<Profile {}>".format(self.name)
+        return "<User {} {} {} {}>".format(self.username, self.email, self.role, self.status)
 
 
 class Activation(Base):
@@ -201,22 +170,11 @@ class Activation(Base):
     valid_until = Column(DateTime, default=lambda: datetime.utcnow() + ACTIVATION_AGE)
     created_by = Column('created_by', CoerceUTF8(255))
 
-    def __init__(self, created_system):
+    def __init__(self, created_by=SIGNUP_METHOD_SIGNUP):
         """Create a new activation"""
-        self.code = Activation._gen_activation_hash()
-        self.created_by = created_system
+        self.code = gen_random_hash()
+        self.created_by = created_by
         self.valid_until = datetime.utcnow() + ACTIVATION_AGE
-
-    @staticmethod
-    def _gen_activation_hash():
-        """Generate a random activation hash for this user account"""
-        # for now just cheat and generate an api key, that'll work for now
-        return gen_api_key()
-
-    def activate(self):
-        """Remove this activation"""
-        with session_scope() as db:
-            db.delete(self)
 
 # class Group(Base):
 #     __tablename__ = 'group'

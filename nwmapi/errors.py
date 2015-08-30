@@ -1,5 +1,7 @@
 import logging
+
 import falcon
+import nwmapi
 from nwmapi.httpstatus import HTTP400BadRequest, HTTP500InternalServerError
 import re
 
@@ -62,13 +64,7 @@ def _HTTPError_to_dict(self, obj_type=dict):
     obj = obj_type()
 
     if self.status is not None:
-        try:
-            try:
-                obj['status'] = int(re.findall(r'^\d+', self.status)[0])
-            except:
-                obj['status'] = int(self.status)
-        except:
-            obj['status'] = self.status
+        obj['status'] = self.status
 
     if self.title is not None:
         obj['title'] = self.title

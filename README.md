@@ -7,6 +7,14 @@ sudo apt-get install build-essential libffi-dev python-dev
 cd nwmapi
 virtualenv env
 source env/bin/activate.fish
+pip install cython
+pip install falcon
+pip install PasteDeploy
+pip install PasteScript
+pip install waitress
+pip install sqlalchemy
+pip install bcrypt
+pip install python-dateutil
 python setup develop
 bin/initialize_nwmdb development.ini
 ```

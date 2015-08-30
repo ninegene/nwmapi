@@ -1,8 +1,23 @@
+import json
 import logging
+from falcon.status_codes import HTTP_404
 
 import falcon
 
 log = logging.getLogger(__name__)
+
+
+class Request(falcon.Request):
+    def __init__(self, env, options=None):
+        super(Request, self).__init__(env, options)
+        self.json = None
+
+
+# Response with a json attribute
+class Response(falcon.Response):
+    def __init__(self):
+        super(Response, self).__init__()
+        self.result = None
 
 
 def send_http200_ok(req, resp, result=None):
@@ -23,7 +38,13 @@ def _respond_json(req, resp, status, result=None, location=None):
 
     # Need to explicitly check None, since we want to pass in empty list or object
     if result is not None:
-        req.context['result'] = result
+        try:
+            resp.body = json.dumps(result)
+        except Exception as e:
+            log.exception(e)
+            raise HTTP500InternalServerError(
+                title='Error converting to JSON',
+                description='Error converting to JSON from %s' % result)
 
     if location:
         resp.location = location
@@ -106,16 +127,23 @@ class HTTP403Forbidden(falcon.HTTPForbidden):
         super(HTTP403Forbidden, self).__init__(title, description, **kwargs)
 
 
-class HTTP404NotFound(falcon.HTTPNotFound):
+class HTTP404NotFound(falcon.HTTPError):
     """404 Not Found.
 
     Use this when the URL path does not map to an existing resource, or you
     do not wish to disclose exactly why a request was refused.
 
+    Args:
+        title (str): Error title (e.g., 'Request Body Limit Exceeded').
+        description (str): Human-friendly description of the error, along with
+            a helpful suggestion or two.
+        kwargs (optional): Same as for ``HTTPError``.
+
     """
 
-    def __init__(self, **kwargs):
-        super(HTTP404NotFound, self).__init__(**kwargs)
+    def __init__(self, title=None, description=None, **kwargs):
+        title = title or '404 Not Found'
+        super(HTTP404NotFound, self).__init__(HTTP_404, title, description, **kwargs)
 
 
 class HTTP405MethodNotAllowed(falcon.HTTPMethodNotAllowed):
@@ -202,7 +230,7 @@ class HTTP415UnsupportedMediaType(falcon.HTTPUnsupportedMediaType):
     """
 
     def __init__(self, description, **kwargs):
-        super(HTTP415UnsupportedMediaType, self).__init__('Unsupported media type', description, **kwargs)
+        super(HTTP415UnsupportedMediaType, self).__init__(description, **kwargs)
 
 
 class HTTP500InternalServerError(falcon.HTTPInternalServerError):
@@ -218,6 +246,24 @@ class HTTP500InternalServerError(falcon.HTTPInternalServerError):
 
     def __init__(self, title, description, **kwargs):
         super(HTTP500InternalServerError, self).__init__(title, description, **kwargs)
+
+
+class HTTP501NotImplemented(falcon.HTTPError):
+    """501 Not Implemented.
+
+    Args:
+        title (str): Error title, for example: 'Method Not Implemented Yet'.
+        description (str): Human-friendly description of the error, along with
+            a helpful suggestion or two.
+        kwargs (optional): Same as for ``HTTPError``.
+
+    """
+
+    def __init__(self, title=None, description=None, **kwargs):
+        title = title or 'Method Not Implemented'
+        description = description or ("The server does not support the functionality required to fulfill"
+                                      " the request.")
+        super(HTTP501NotImplemented, self).__init__(falcon.HTTP_501, title, description, **kwargs)
 
 
 class HTTP503ServiceUnavailable(falcon.HTTPServiceUnavailable):

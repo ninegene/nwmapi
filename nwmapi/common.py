@@ -78,15 +78,84 @@ def get_appsettings(config_uri, name=None, options=None, appconfig=appconfig):
         global_conf=options)
 
 
-def get_random_chars(size):
+def get_random_alphanumeric(size):
     word = ''
     for i in xrange(size):
-        word += random.choice(('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/&='))
+        word += random.choice(('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'))
     return word
 
 
-def gen_api_key():
-    """Generate a 12 char api key for the user to use"""
+def gen_random_hash(size=32):
+    """Generate a random chars hash. default to 32 chars"""
+    assert 1 < size <= 64
+
     m = hashlib.sha256()
-    m.update(get_random_chars(12))
-    return unicode(m.hexdigest()[:12])
+    m.update(get_random_alphanumeric(size))
+    return unicode(m.hexdigest()[:size])
+
+# to json code taken from:
+# https://github.com/kolypto/py-flask-jsontools/blob/master/flask_jsontools/formatting.py
+
+# region SqlAlchemy Tools
+# try:
+#     from sqlalchemy import inspect
+#     from sqlalchemy.orm.state import InstanceState
+# except ImportError as e:
+#     def __nomodule(*args, **kwargs):
+#         raise e
+#
+#     inspect = __nomodule
+#     InstanceState = __nomodule
+
+
+from sqlalchemy import inspect
+from sqlalchemy.orm.state import InstanceState
+
+def get_entity_propnames(entity):
+    """ Get entity property names
+        :param entity: Entity
+        :type entity: sqlalchemy.ext.declarative.api.DeclarativeMeta
+        :returns: Set of entity property names
+        :rtype: set
+    """
+    ins = entity if isinstance(entity, InstanceState) else inspect(entity)
+    return set(
+        ins.mapper.column_attrs.keys() +  # Columns
+        ins.mapper.relationships.keys()  # Relationships
+    )
+
+
+def get_entity_loaded_propnames(entity):
+    """ Get entity property names that are loaded (e.g. won't produce new queries)
+        :param entity: Entity
+        :type entity: sqlalchemy.ext.declarative.api.DeclarativeMeta
+        :returns: Set of entity property names
+        :rtype: set
+    """
+    ins = inspect(entity)
+    keynames = get_entity_propnames(ins)
+
+    # If the entity is not transient -- exclude unloaded keys
+    # Transient entities won't load these anyway, so it's safe to include all columns and get defaults
+    if not ins.transient:
+        keynames -= ins.unloaded
+
+    # If the entity is expired -- reload expired attributes as well
+    # Expired attributes are usually unloaded as well!
+    if ins.expired:
+        keynames |= ins.expired_attributes
+
+    # Finish
+    return keynames
+
+
+class JsonSerializableBase(object):
+    """ Declarative Base mixin to allow objects serialization
+        Defines interfaces utilized by :cls:ApiJSONEncoder
+    """
+
+    def __json__(self, exluded_keys=set()):
+        return {name: getattr(self, name)
+                for name in get_entity_loaded_propnames(self) - exluded_keys}
+
+# endregion

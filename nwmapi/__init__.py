@@ -1,7 +1,8 @@
 import falcon
 from nwmapi.errors import json_error_serializer, raise_unknown_url, UnknownUrl, handle_server_error
-from nwmapi.middleware import RequestResponseLogger, RequireJSON, JSONTranslator
-from nwmapi.models import Session, Base
+from nwmapi.httpstatus import Request, Response
+from nwmapi.middleware import DBTransaction, RequireJSON, JSONTranslator
+from nwmapi.models import Base, Session
 from nwmapi.resources.users import UserResource, UsersResource
 from sqlalchemy import engine_from_config
 
@@ -27,10 +28,13 @@ def main(global_config, **settings):
         # to the error type. If the type matches a registered error handler, that handler will be invoked
         # and then the framework will begin to unwind the stack, skipping any lower layers.
         middleware=[
-            RequestResponseLogger(),
+            DBTransaction(),
             RequireJSON(),
             JSONTranslator(),
-        ])
+        ],
+        request_type=Request,
+        response_type=Response,
+    )
 
     app.set_error_serializer(json_error_serializer)
 
@@ -70,10 +74,9 @@ def add_routes(app):
 
     app.add_sink(raise_unknown_url)
     app.add_route('/', UnknownUrl())
-    app.add_route('/{method}', UnknownUrl())
 
     app.add_route('/users', users)
-    app.add_route('/users/{uuid}', user)
+    app.add_route('/users/{id}', user)
 
     # If a responder ever raised an instance of Exception, pass control to the given handler.
     app.add_error_handler(Exception, handle_server_error)

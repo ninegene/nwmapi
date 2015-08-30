@@ -1,33 +1,45 @@
-import json
 import logging
+import json
 
-import falcon
 from nwmapi.httpstatus import HTTP400BadRequest, HTTP406NotAcceptable, HTTP415UnsupportedMediaType
+from nwmapi.models import get_dbsession
+from sqlalchemy.exc import SQLAlchemyError
 
 log = logging.getLogger(__name__)
 
 
-class RequestResponseLogger(object):
+class DBTransaction(object):
     def process_request(self, req, resp):
-        log.info('%s %s %s', req.protocol.upper(), req.method, req.relative_uri)
+        log_debug(req, 'DBTransaction: before request')
+        req.dbsession = get_dbsession()
 
     def process_response(self, req, resp, resource):
-        log.info('%s', resp.body)
+        log_debug(req, 'DBTransaction: after response')
+        session = req.dbsession
+        try:
+            session.commit()
+        except SQLAlchemyError as e:
+            log.exception(e)
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
 
 class RequireJSON(object):
     def process_request(self, req, resp):
+        log_debug(req, 'RequireJSON: before request')
         if not req.client_accepts_json:
-            log.error('RequireJSON: req.client_accepts_json is empty')
-            raise HTTP406NotAcceptable('Unsupported response encoding', href='')
+            raise HTTP406NotAcceptable('Unsupported response encoding', href='https://url/to/docs')
 
         if req.method in ('POST', 'PUT'):
-            if 'application/json' not in req.content_type:
-                raise HTTP415UnsupportedMediaType('Unsupported content type', href='')
+            if not req.content_type or 'application/json' not in req.content_type:
+                raise HTTP415UnsupportedMediaType('Unsupported content type', href='https://url/to/docs')
 
 
 class JSONTranslator(object):
     def process_request(self, req, resp):
+        log_debug(req, 'JSONTranslator: before request')
         # req.stream corresponds to the WSGI wsgi.input environ variable,
         # and allows you to read bytes form the request body
         #
@@ -38,19 +50,21 @@ class JSONTranslator(object):
 
         body = req.stream.read()
         if not body:
-            raise HTTP400BadRequest('Empty request body',
-                                    'A valid JSON document is required.')
+            raise HTTP400BadRequest(
+                title='Empty request body',
+                description='A valid JSON document is required.')
 
         try:
-            req.context['doc'] = json.loads(body.decode('utf-8'))
+            req.json = json.loads(body)
+        # except (ValueError, UnicodeDecodeError):
+        except Exception as e:
+            log.exception(e)
+            raise HTTP400BadRequest(
+                title='Malformed JSON',
+                description='Could not decode the request body. '
+                            'The JSON was incorrect or not encoded as UTF-8')
 
-        except (ValueError, UnicodeDecodeError):
-            raise HTTP400BadRequest('Malformed JSON',
-                                    'Could not decode the request body. '
-                                    'The JSON was incorrect or not encoded as UTF-8')
 
-    def process_response(self, req, resp, resource):
-        if 'result' not in req.context:
-            return
 
-        resp.body = json.dumps(req.context['result'])
+def log_debug(req, msg):
+    log.debug('%s %s %s %s', msg, req.protocol.upper(), req.method, req.relative_uri)

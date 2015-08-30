@@ -1,24 +1,67 @@
+import logging
 from nwmapi.httpstatus import HTTP400InvalidParam, HTTP413RequestEntityTooLarge, HTTP400BadRequest, \
     HTTP400MissingParam
 
+log = logging.getLogger(__name__)
 
-def require_uuid():
+
+def require_path_param(*args):
     def hook(req, resp, resource, params):
-        uuid = params.get('uuid')
-        if uuid is None:
-            raise HTTP400MissingParam('uuid')
+        log.debug('require_path_param %s', params)
+        for name in args:
+            if name not in params:
+                raise HTTP400MissingParam(name)
+            if name == 'id':
+                check_id(params)
 
-        if len(uuid) != 32:
-            raise HTTP400InvalidParam('The "uuid" needs to be 32 characters in length', 'uuid')
+    def check_id(params):
+        id = params.get('id')
+        if len(id) != 32:
+            raise HTTP400InvalidParam('The "id" needs to be 32 characters in length', 'id')
+
+    return hook
+
+
+def require_query_param(*args):
+    def hook(req, resp, resource, params):
+        log.debug('require_query_param %s', req.params)
+        for name in args:
+            if name not in req.params:
+                raise HTTP400MissingParam(name)
 
     return hook
 
 
 def require_req_body():
+
     def hook(req, resp, resource, params):
-        if req.content_length in (None, 0):
-            raise HTTP400BadRequest('Empty request body',
-                                    'A valid JSON document is required.')
+        log.debug('require_req_body')
+        _check_req_body_exists(req)
+
+    return hook
+
+
+def _check_req_body_exists(req):
+    if req.content_length in (None, 0):
+        raise HTTP400BadRequest('Empty request body',
+                                'A valid JSON document is required.')
+
+
+def require_json_keys(*argv):
+    def hook(req, resp, resource, params):
+        log.debug('require_json_req %s', argv)
+        _check_req_body_exists(req)
+
+        data = req.json
+
+        if argv is not None:
+            for key in argv:
+                check_exists(key, data)
+
+    def check_exists(key, data):
+        if key not in data:
+            raise HTTP400MissingParam(key)
+
     return hook
 
 
