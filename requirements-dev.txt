@@ -1,9 +1,12 @@
-Cython==0.23
+bcrypt==2.0.0
+cffi==1.2.1
+Cython==0.23.1
 falcon==0.3.0
-nwmapi==0.0
 Paste==2.0.2
 PasteDeploy==1.5.2
 PasteScript==2.0.2
+pycparser==2.14
+python-dateutil==2.4.2
 python-mimeparse==0.1.4
 six==1.9.0
 SQLAlchemy==1.0.8

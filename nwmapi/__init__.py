@@ -1,7 +1,6 @@
 import falcon
 from nwmapi.errors import json_error_serializer, raise_unknown_url, UnknownUrl, handle_server_error
-from nwmapi.httpstatus import Request, Response
-from nwmapi.middleware import DBTransaction, RequireJSON, JSONTranslator
+from nwmapi.middleware import DBTransaction, RequireJSON, JSONBodyTranslator, Request
 from nwmapi.models import Base, Session
 from nwmapi.resources.users import UserResource, UsersResource
 from sqlalchemy import engine_from_config
@@ -30,10 +29,14 @@ def main(global_config, **settings):
         middleware=[
             DBTransaction(),
             RequireJSON(),
-            JSONTranslator(),
+            JSONBodyTranslator(),
         ],
-        request_type=Request,
-        response_type=Response,
+
+        # ``Request``-like class to use instead of Falcon's default class. Among other things,
+        # this feature affords inheriting from ``falcon.request.Request`` in order
+        # to override the ``context_type`` class variable.
+        # (default ``falcon.request.Request``)
+        request_type=Request
     )
 
     app.set_error_serializer(json_error_serializer)

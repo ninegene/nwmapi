@@ -1,10 +1,9 @@
 import logging
-import uuid
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import bcrypt
 from dateutil.tz import tzutc
-from nwmapi.common import gen_random_hash
+from nwmapi.common import gen_random_hash, ordered_uuid1, utcnow
 from nwmapi.models import GUID, Base, CoerceUTF8, UTCDateTime
 from sqlalchemy import Column, String, func, ForeignKey, Enum, UnicodeText, Integer, DateTime
 from sqlalchemy.orm import relationship, synonym
@@ -41,7 +40,7 @@ SIGNUP_METHOD_TEST = 'test'
 class User(Base):
     __tablename__ = u'user'
 
-    id = Column(GUID, default=uuid.uuid4, primary_key=True)
+    id = Column(GUID, default=ordered_uuid1, primary_key=True)
     username = Column(CoerceUTF8(255), unique=True)
     _password = Column('password', CoerceUTF8(60))
     email = Column(String(255), unique=True)
@@ -167,14 +166,14 @@ class Activation(Base):
 
     user_id = Column(GUID, ForeignKey('user.id'), primary_key=True)
     code = Column(CoerceUTF8(60))
-    valid_until = Column(DateTime, default=lambda: datetime.utcnow() + ACTIVATION_AGE)
+    valid_until = Column(UTCDateTime, default=lambda: utcnow() + ACTIVATION_AGE)
     created_by = Column('created_by', CoerceUTF8(255))
 
     def __init__(self, created_by=SIGNUP_METHOD_SIGNUP):
         """Create a new activation"""
         self.code = gen_random_hash()
         self.created_by = created_by
-        self.valid_until = datetime.utcnow() + ACTIVATION_AGE
+        self.valid_until = utcnow() + ACTIVATION_AGE
 
 # class Group(Base):
 #     __tablename__ = 'group'

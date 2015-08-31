@@ -7,19 +7,6 @@ import falcon
 log = logging.getLogger(__name__)
 
 
-class Request(falcon.Request):
-    def __init__(self, env, options=None):
-        super(Request, self).__init__(env, options)
-        self.json = None
-
-
-# Response with a json attribute
-class Response(falcon.Response):
-    def __init__(self):
-        super(Response, self).__init__()
-        self.result = None
-
-
 def send_http200_ok(req, resp, result=None):
     _respond_json(req, resp, falcon.HTTP_200, result)
 

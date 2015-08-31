@@ -2,6 +2,9 @@ import ConfigParser as configparser
 import hashlib
 from logging.config import fileConfig
 import random
+import uuid
+from datetime import datetime
+from dateutil.tz import tzutc
 
 import os
 from paste.deploy import (
@@ -93,69 +96,40 @@ def gen_random_hash(size=32):
     m.update(get_random_alphanumeric(size))
     return unicode(m.hexdigest()[:size])
 
-# to json code taken from:
-# https://github.com/kolypto/py-flask-jsontools/blob/master/flask_jsontools/formatting.py
 
-# region SqlAlchemy Tools
-# try:
-#     from sqlalchemy import inspect
-#     from sqlalchemy.orm.state import InstanceState
-# except ImportError as e:
-#     def __nomodule(*args, **kwargs):
-#         raise e
-#
-#     inspect = __nomodule
-#     InstanceState = __nomodule
-
-
-from sqlalchemy import inspect
-from sqlalchemy.orm.state import InstanceState
-
-def get_entity_propnames(entity):
-    """ Get entity property names
-        :param entity: Entity
-        :type entity: sqlalchemy.ext.declarative.api.DeclarativeMeta
-        :returns: Set of entity property names
-        :rtype: set
+# See also:https://www.percona.com/blog/2014/12/19/store-uuid-optimized-way/
+# Taken from: https://github.com/procession/procession/blob/master/procession/helpers.py
+def ordered_uuid1():
     """
-    ins = entity if isinstance(entity, InstanceState) else inspect(entity)
-    return set(
-        ins.mapper.column_attrs.keys() +  # Columns
-        ins.mapper.relationships.keys()  # Relationships
-    )
+    Returns a UUID type 1 value, with the more constant segments of the
+    UUID at the start of the UUID. This allows us to have mostly monotonically
+    increasing UUID values, which are much better for INSERT/UPDATE performance
+    in the DB.
 
+    A UUID1 hex looks like:
 
-def get_entity_loaded_propnames(entity):
-    """ Get entity property names that are loaded (e.g. won't produce new queries)
-        :param entity: Entity
-        :type entity: sqlalchemy.ext.declarative.api.DeclarativeMeta
-        :returns: Set of entity property names
-        :rtype: set
+        '27392da2-8bae-11e4-961d-e06995034837'
+
+    From this, we need to take the last two segments, which represent the more
+    constant information about the node we're on, and place those first in the
+    new UUID's bytes. We then take the '11e4' segment, which represents the
+    most significant bits of the timestamp part of the UUID, prefixed with a
+    '1' for UUID type, and place that next, followed by the second segment and
+    finally the first segment, which are the next most significant bits of the
+    timestamp 60-bit number embedded in the UUID.
+
+    So, we convert the above hex to this instead:
+
+        '961de069-9503-4837-11e4-8bae27392da2'
+
     """
-    ins = inspect(entity)
-    keynames = get_entity_propnames(ins)
-
-    # If the entity is not transient -- exclude unloaded keys
-    # Transient entities won't load these anyway, so it's safe to include all columns and get defaults
-    if not ins.transient:
-        keynames -= ins.unloaded
-
-    # If the entity is expired -- reload expired attributes as well
-    # Expired attributes are usually unloaded as well!
-    if ins.expired:
-        keynames |= ins.expired_attributes
-
-    # Finish
-    return keynames
+    val = uuid.uuid1().hex
+    new_val = val[16:] + val[12:16] + val[8:12] + val[0:8]
+    return uuid.UUID(new_val)
 
 
-class JsonSerializableBase(object):
-    """ Declarative Base mixin to allow objects serialization
-        Defines interfaces utilized by :cls:ApiJSONEncoder
+def utcnow():
     """
-
-    def __json__(self, exluded_keys=set()):
-        return {name: getattr(self, name)
-                for name in get_entity_loaded_propnames(self) - exluded_keys}
-
-# endregion
+    :return: current datetime in utc with utc timezone
+    """
+    return datetime.now(tz=tzutc())

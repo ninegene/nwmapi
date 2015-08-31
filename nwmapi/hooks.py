@@ -1,6 +1,8 @@
 import logging
+
 from nwmapi.httpstatus import HTTP400InvalidParam, HTTP413RequestEntityTooLarge, HTTP400BadRequest, \
     HTTP400MissingParam
+import re
 
 log = logging.getLogger(__name__)
 
@@ -15,9 +17,9 @@ def require_path_param(*args):
                 check_id(params)
 
     def check_id(params):
-        id = params.get('id')
-        if len(id) != 32:
-            raise HTTP400InvalidParam('The "id" needs to be 32 characters in length', 'id')
+        val = params.get('id')
+        if not re.match("[a-fA-F0-9]{32}$", val):
+            raise HTTP400InvalidParam('The "id" needs to be 32 digits hex numbers', 'id')
 
     return hook
 
@@ -33,7 +35,6 @@ def require_query_param(*args):
 
 
 def require_req_body():
-
     def hook(req, resp, resource, params):
         log.debug('require_req_body')
         _check_req_body_exists(req)

@@ -61,6 +61,7 @@ def get_users(req, resp):
 def create_user(req, resp):
     s = UserService(req.dbsession)
 
+    log.debug(req.json)
     raise HTTP501NotImplemented()
     # user_id = 'test'
     # send_http201_created(req, resp, location='/user/' + user_id)

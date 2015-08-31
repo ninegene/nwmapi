@@ -1,5 +1,6 @@
 import logging
 import json
+import falcon
 
 from nwmapi.httpstatus import HTTP400BadRequest, HTTP406NotAcceptable, HTTP415UnsupportedMediaType
 from nwmapi.models import get_dbsession
@@ -37,9 +38,16 @@ class RequireJSON(object):
                 raise HTTP415UnsupportedMediaType('Unsupported content type', href='https://url/to/docs')
 
 
-class JSONTranslator(object):
+class Request(falcon.Request):
+    """Override falcon.Request to provide 'json' attribute on request object"""
+    def __init__(self, env, options=None):
+        super(Request, self).__init__(env, options)
+        self.json = None
+
+
+class JSONBodyTranslator(object):
     def process_request(self, req, resp):
-        log_debug(req, 'JSONTranslator: before request')
+        log_debug(req, 'JSONBodyTranslator: before request')
         # req.stream corresponds to the WSGI wsgi.input environ variable,
         # and allows you to read bytes form the request body
         #

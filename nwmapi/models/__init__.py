@@ -12,7 +12,6 @@ import uuid
 
 log = logging.getLogger(__name__)
 
-
 # See: http://docs.sqlalchemy.org/en/rel_1_0/orm/extensions/declarative/mixins.html#augmenting-the-base
 class Base(object):
     def to_dict(self, excluded_columns=set()):
@@ -24,10 +23,17 @@ class Base(object):
             if type(v) is uuid.UUID:
                 result[c.name] = v.hex
             elif type(v) is datetime:
+                v = v.replace(microsecond=0)
                 result[c.name] = v.isoformat()
             else:
                 result[c.name] = v
+
+        # Also convert relationships?
+        # ins = self if isinstance(self, InstanceState) else inspect(self)
+        # rel_keys = ins.mapper.relationships.keys()
+
         return result
+
 
 # Base is a class and has its own metadata property and its own registry.
 # The reason we use 'declarative_base' function to create Base class
