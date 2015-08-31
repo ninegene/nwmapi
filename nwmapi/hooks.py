@@ -53,7 +53,7 @@ def require_json_keys(*argv):
         log.debug('require_json_req %s', argv)
         _check_req_body_exists(req)
 
-        data = req.json
+        data = req.json_data
 
         if argv is not None:
             for key in argv:

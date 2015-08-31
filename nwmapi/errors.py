@@ -29,7 +29,13 @@ def handle_server_error(ex, req, resp, params):
     http_error = ex
 
     if not isinstance(ex, falcon.HTTPError):
-        http_error = HTTP500InternalServerError(title=str(type(ex)), description=str(ex.message))
+        description = repr(ex)
+        # if hasattr(ex, 'asdict') and callable(ex.asdict):
+        #     description = repr(ex.asdict)
+
+        http_error = HTTP500InternalServerError(
+            title=repr(type(ex)),
+            description=description)
 
     raise http_error
 

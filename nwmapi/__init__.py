@@ -1,6 +1,6 @@
 import falcon
 from nwmapi.errors import json_error_serializer, raise_unknown_url, UnknownUrl, handle_server_error
-from nwmapi.middleware import DBTransaction, RequireJSON, JSONBodyTranslator, Request
+from nwmapi.middleware import RequireJSONType, ReqBodyJSONTranslator, Request, DBSession
 from nwmapi.models import Base, Session
 from nwmapi.resources.users import UserResource, UsersResource
 from sqlalchemy import engine_from_config
@@ -27,9 +27,9 @@ def main(global_config, **settings):
         # to the error type. If the type matches a registered error handler, that handler will be invoked
         # and then the framework will begin to unwind the stack, skipping any lower layers.
         middleware=[
-            DBTransaction(),
-            RequireJSON(),
-            JSONBodyTranslator(),
+            DBSession(),
+            RequireJSONType(),
+            ReqBodyJSONTranslator(),
         ],
 
         # ``Request``-like class to use instead of Falcon's default class. Among other things,

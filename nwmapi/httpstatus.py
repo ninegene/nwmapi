@@ -20,6 +20,7 @@ def send_http204_nocontent(req, resp):
 
 
 def _respond_json(req, resp, status, result=None, location=None):
+
     resp.content_type = 'application/json; charset=utf-8'
     resp.status = status
 

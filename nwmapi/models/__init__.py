@@ -34,7 +34,6 @@ class Base(object):
 
         return result
 
-
 # Base is a class and has its own metadata property and its own registry.
 # The reason we use 'declarative_base' function to create Base class
 # is because that allow us to create another Base class if necessary.
@@ -70,20 +69,17 @@ def get_dbsession():
 
 
 # @contextmanager
-# def transactional_session_scope():
+# def transactional_dbsession():
 #     """Provide a transactional scope around a series of operations."""
 #     # Use session object to persist and load objects from database
-#     session = Session()  # invokes sessionmaker.__call__() to create and instance of Session class
+#     dbsession = Session()  # invokes sessionmaker.__call__() to create and instance of Session class
 #     try:
-#         yield session
-#         session.commit()
+#         yield dbsession
+#         dbsession.commit()
 #     except SQLAlchemyError as e:
 #         log.exception(e)
-#         session.rollback()
+#         dbsession.rollback()
 #         raise
-#     finally:
-#         session.close()
-
 
 
 # Based on: http://docs.sqlalchemy.org/en/rel_1_0/core/custom_types.html#typedecorator-recipes
@@ -160,5 +156,3 @@ class UTCDateTime(TypeDecorator):
             return datetime(value.year, value.month, value.day,
                             value.hour, value.minute, value.second,
                             value.microsecond, tzinfo=tzutc())
-
-

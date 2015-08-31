@@ -97,34 +97,16 @@ def gen_random_hash(size=32):
     return unicode(m.hexdigest()[:size])
 
 
-# See also:https://www.percona.com/blog/2014/12/19/store-uuid-optimized-way/
-# Taken from: https://github.com/procession/procession/blob/master/procession/helpers.py
+# See: https://www.percona.com/blog/2014/12/19/store-uuid-optimized-way/
 def ordered_uuid1():
     """
     Returns a UUID type 1 value, with the more constant segments of the
     UUID at the start of the UUID. This allows us to have mostly monotonically
     increasing UUID values, which are much better for INSERT/UPDATE performance
     in the DB.
-
-    A UUID1 hex looks like:
-
-        '27392da2-8bae-11e4-961d-e06995034837'
-
-    From this, we need to take the last two segments, which represent the more
-    constant information about the node we're on, and place those first in the
-    new UUID's bytes. We then take the '11e4' segment, which represents the
-    most significant bits of the timestamp part of the UUID, prefixed with a
-    '1' for UUID type, and place that next, followed by the second segment and
-    finally the first segment, which are the next most significant bits of the
-    timestamp 60-bit number embedded in the UUID.
-
-    So, we convert the above hex to this instead:
-
-        '961de069-9503-4837-11e4-8bae27392da2'
-
     """
     val = uuid.uuid1().hex
-    new_val = val[16:] + val[12:16] + val[8:12] + val[0:8]
+    new_val = val[12:16] + val[8:12] + val[0:8] + val[16:]
     return uuid.UUID(new_val)
 
 

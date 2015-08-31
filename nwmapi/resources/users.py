@@ -2,7 +2,8 @@ import logging
 
 import falcon
 from nwmapi.hooks import require_json_keys, require_req_body, require_query_param, require_path_param
-from nwmapi.httpstatus import HTTP404NotFound, send_http200_ok, HTTP501NotImplemented
+from nwmapi.httpstatus import HTTP404NotFound, send_http200_ok, HTTP501NotImplemented, \
+    send_http201_created
 from nwmapi.resources import BaseHandler
 from nwmapi.services.userservice import UserService
 
@@ -61,10 +62,10 @@ def get_users(req, resp):
 def create_user(req, resp):
     s = UserService(req.dbsession)
 
-    log.debug(req.json)
-    raise HTTP501NotImplemented()
-    # user_id = 'test'
-    # send_http201_created(req, resp, location='/user/' + user_id)
+    data = req.json_data
+    user = s.signup_user(data['email'], data['username'])
+
+    send_http201_created(req, resp, location='/user/%s' % user.id)
 
 
 def get_user(req, resp, id):

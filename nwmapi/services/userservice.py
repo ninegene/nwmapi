@@ -2,19 +2,18 @@ from datetime import datetime
 import logging
 
 from nwmapi.models.user import User, NON_ACTIVATION_AGE, Activation, USER_STATUS_INACTIVE, \
-    USER_STATUS_ACTIVE, SIGNUP_METHOD_INVITE, SIGNUP_METHOD_SIGNUP
+    USER_STATUS_ACTIVE, SIGNUP_METHOD_SIGNUP
 
 log = logging.getLogger(__name__)
 
 
 class UserService(object):
+    def __init__(self, dbsession):
+        self.dbsession = dbsession
 
-    def __init__(self, db):
-        self.db = db
-        
     def get_user_list(self, status=None, role=None, order=None, limit=None):
         """Get a list of all of the user accounts"""
-        q = self.db.query(User).order_by(User.username)
+        q = self.dbsession.query(User).order_by(User.username)
 
         if status is not None:
             q = q.filter(User.status == status)
@@ -34,7 +33,7 @@ class UserService(object):
 
     def get_user(self, id=None, username=None, email=None):
         """Get the user instance for this information """
-        q = self.db.query(User)
+        q = self.dbsession.query(User)
 
         if username is not None:
             return q.filter(User.username == username).first()
@@ -54,22 +53,23 @@ class UserService(object):
         new_user.username = username
         new_user.reactivate(signup_method)
 
-        self.db.add(new_user)
+        self.dbsession.add(new_user)
+        self.dbsession.commit()
         return new_user
 
     def activate(self, activation):
         """Remove this activation"""
-        self.db.delete(activation)
+        self.dbsession.delete(activation)
 
     def activation_count(self):
         """Count how many activations are in the system."""
-        return self.db.query(Activation).count()
+        return self.dbsession.query(Activation).count()
 
     def get_user_by_activation_code(self, username, code):
         """Get the user for this code"""
-        activation = self.db.query(Activation)\
-            .filter(Activation.code == code)\
-            .filter(User.username == username)\
+        activation = self.dbsession.query(Activation) \
+            .filter(Activation.code == code) \
+            .filter(User.username == username) \
             .first()
 
         if activation is not None:
@@ -79,7 +79,7 @@ class UserService(object):
 
     def activate_user(self, username, code, new_pass):
         """Given this code get the user with this code make sure they exist"""
-        activation = self.db.query(Activation) \
+        activation = self.dbsession.query(Activation) \
             .filter(Activation.code == code) \
             .filter(User.username == username) \
             .first()
@@ -114,19 +114,18 @@ class UserService(object):
         """Get a list of  user accounts which are not verified since 30 days of signup"""
         test_date = datetime.utcnow() - NON_ACTIVATION_AGE
 
-        subquery = self.db.query(Activation.id). \
+        subquery = self.dbsession.query(Activation.id). \
             filter(Activation.valid_until < test_date). \
             subquery(name="query")
 
-        user_query = self.db.query(User). \
+        user_query = self.dbsession.query(User). \
             filter(User.status == USER_STATUS_INACTIVE). \
-            filter(User.last_login.is_(None)). \
             filter(User.id.in_(subquery))
 
         # Delete the non activated accounts only if it is asked to.
         if delete:
             for user in user_query.all():
-                self.db.delete(user)
+                self.dbsession.delete(user)
         # If the non activated accounts are not asked to be deleted,
         # return their details.
         else:
@@ -134,5 +133,4 @@ class UserService(object):
 
     def user_count(self):
         """Number of users in the system."""
-        return self.db.query(User).count()
-
+        return self.dbsession.query(User).count()
