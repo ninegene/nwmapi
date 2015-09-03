@@ -1,11 +1,11 @@
 import logging
 from datetime import timedelta
+import uuid
 
 import bcrypt
 from dateutil.tz import tzutc
-from nwmapi.common import gen_random_hash, ordered_uuid1, utcnow
-from nwmapi.models import GUID, Base, CoerceUTF8, UTCDateTime
-from sqlalchemy import Column, String, func, ForeignKey, Enum, UnicodeText, Integer, DateTime
+from nwmapi.db import GUID, Base, CoerceUTF8, UTCDateTime, ordered_uuid1, utcnow
+from sqlalchemy import Column, String, func, ForeignKey, Enum, UnicodeText
 from sqlalchemy.orm import relationship, synonym
 
 log = logging.getLogger(__name__)
@@ -141,9 +141,17 @@ class User(Base):
 
     def to_dict(self, excluded_columns=set()):
         excluded_columns = excluded_columns | {'password'}
-        result = super(User, self).to_dict(excluded_columns)
+        result = super(User, self).to_dict(excluded_columns=excluded_columns)
         result['activation'] = self.activation.to_dict(excluded_columns={'user_id'})
         return result
+
+    def from_dict(self, dictionary):
+        dictionary = dictionary or {}
+        email = dictionary.get('email', None)
+        if email:
+            dictionary['email'] = email.lower()
+        dictionary.setdefault('status', USER_STATUS_INACTIVE)
+        return super(User, self).from_dict(dictionary)
 
     def __repr__(self):
         return "<User {} {} {} {}>".format(self.username, self.email, self.role, self.status)
@@ -171,7 +179,7 @@ class Activation(Base):
 
     def __init__(self, created_by=SIGNUP_METHOD_SIGNUP):
         """Create a new activation"""
-        self.code = gen_random_hash()
+        self.code = uuid.uuid4().hex
         self.created_by = created_by
         self.valid_until = utcnow() + ACTIVATION_AGE
 

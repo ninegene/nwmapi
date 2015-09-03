@@ -1,8 +1,9 @@
 import falcon
 from nwmapi.errors import json_error_serializer, raise_unknown_url, UnknownUrl, handle_server_error
-from nwmapi.middleware import RequireJSONType, ReqBodyJSONTranslator, Request, DBSession
-from nwmapi.models import Base, Session
-from nwmapi.resources.users import UserResource, UsersResource
+from nwmapi.middleware import ReqRequireJSONType, ReqBodyJSONTranslator, JSONRequest, JSONResponse, \
+    DBSession
+from nwmapi.db import Base, Session
+from nwmapi.resources.users import UserResource, UserListResource
 from sqlalchemy import engine_from_config
 
 
@@ -28,7 +29,7 @@ def main(global_config, **settings):
         # and then the framework will begin to unwind the stack, skipping any lower layers.
         middleware=[
             DBSession(),
-            RequireJSONType(),
+            ReqRequireJSONType(),
             ReqBodyJSONTranslator(),
         ],
 
@@ -36,7 +37,8 @@ def main(global_config, **settings):
         # this feature affords inheriting from ``falcon.request.Request`` in order
         # to override the ``context_type`` class variable.
         # (default ``falcon.request.Request``)
-        request_type=Request
+        request_type=JSONRequest,
+        response_type=JSONResponse,
     )
 
     app.set_error_serializer(json_error_serializer)
@@ -48,7 +50,7 @@ def main(global_config, **settings):
 
 def add_routes(app):
     user = UserResource()
-    users = UsersResource()
+    users = UserListResource()
 
     # The router treats URI paths as a tree of URI segments and searches by
     # checking the URI one segment at a time. Instead of interpreting the route

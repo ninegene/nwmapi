@@ -1,4 +1,3 @@
-import json
 import logging
 from falcon.status_codes import HTTP_404
 
@@ -7,35 +6,41 @@ import falcon
 log = logging.getLogger(__name__)
 
 
-def send_http200_ok(req, resp, result=None):
-    _respond_json(req, resp, falcon.HTTP_200, result)
-
-
-def send_http201_created(req, resp, result=None, location=None):
-    _respond_json(req, resp, falcon.HTTP_201, result, location)
-
-
-def send_http204_nocontent(req, resp):
-    _respond_json(req, resp, falcon.HTTP_204)
-
-
-def _respond_json(req, resp, status, result=None, location=None):
-
-    resp.content_type = 'application/json; charset=utf-8'
-    resp.status = status
-
-    # Need to explicitly check None, since we want to pass in empty list or object
-    if result is not None:
-        try:
-            resp.body = json.dumps(result)
-        except Exception as e:
-            log.exception(e)
-            raise HTTP500InternalServerError(
-                title='Error converting to JSON',
-                description='Error converting to JSON from %s' % result)
-
-    if location:
-        resp.location = location
+# def send_http200_ok(resp, result=None):
+#     _respond_json(resp, falcon.HTTP_200, result)
+#
+#
+# def send_http201_created(resp, result=None, location=None):
+#     _respond_json(resp, falcon.HTTP_201, result, location)
+#
+#
+# def send_http204_nocontent(resp):
+#     _respond_json(resp, falcon.HTTP_204)
+#
+#
+# def _respond_json(resp, status, result=None, location=None):
+#     resp.content_type = 'application/json; charset=utf-8'
+#     resp.status = status
+#
+#     if location:
+#         resp.location = location
+#
+#     # Need to explicitly check None, since we want to pass in empty list or object
+#     if result is not None:
+#         resp.body = _jsonify(result)
+#
+#
+# def _jsonify(o, **kwargs):
+#     if type(o) is list:
+#         o = [m.to_dict() for m in o]
+#
+#     try:
+#         return json.dumps(o, cls=JSONEncoder, encoding='utf-8', **kwargs)
+#     except Exception as e:
+#         log.exception(e)
+#         raise HTTP500InternalServerError(
+#             title='Error converting to JSON',
+#             description='Error converting to JSON from %s' % o)
 
 
 class HTTP400BadRequest(falcon.HTTPBadRequest):
@@ -71,7 +76,6 @@ class HTTP400MissingParam(falcon.HTTPMissingParam):
 
     def __init__(self, param_name, **kwargs):
         super(HTTP400MissingParam, self).__init__(param_name, **kwargs)
-
 
 
 class HTTP400InvalidParam(falcon.HTTPInvalidParam):

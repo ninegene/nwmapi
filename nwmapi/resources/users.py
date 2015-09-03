@@ -1,9 +1,8 @@
 import logging
 
 import falcon
-from nwmapi.hooks import require_json_keys, require_req_body, require_query_param, require_path_param
-from nwmapi.httpstatus import HTTP404NotFound, send_http200_ok, HTTP501NotImplemented, \
-    send_http201_created
+from nwmapi.hooks import require_json_keys, require_query_param, require_path_param
+from nwmapi.httpstatus import HTTP404NotFound, HTTP501NotImplemented
 from nwmapi.resources import BaseHandler
 from nwmapi.services.userservice import UserService
 
@@ -19,10 +18,10 @@ log = logging.getLogger(__name__)
 # delete_user()  DELETE        /users/<id>
 
 
-class UsersResource(BaseHandler):
+class UserListResource(BaseHandler):
     @falcon.before(require_query_param('limit'))
     def on_get(self, req, resp):
-        get_users(req, resp)
+        get_user_list(req, resp)
 
     @falcon.before(require_json_keys('username', 'email'))
     def on_post(self, req, resp):
@@ -35,37 +34,34 @@ class UserResource(BaseHandler):
         get_user(req, resp, id)
 
     @falcon.before(require_path_param('id'))
-    @falcon.before(require_json_keys('username', 'email'))
     def on_put(self, req, resp, id):
-        replace_user(req, resp, id)
+        update_user(req, resp, id)
 
     @falcon.before(require_path_param('id'))
-    @falcon.before(require_req_body())
+    @falcon.before(require_json_keys('username', 'email'))
     def on_post(self, req, resp, id):
-        update_user(req, resp, id)
+        replace_user(req, resp, id)
 
     @falcon.before(require_path_param('id'))
     def on_delete(self, req, resp, id):
         delete_user(req, resp, id)
 
 
-def get_users(req, resp):
+def get_user_list(req, resp):
     limit = req.params['limit']
     s = UserService(req.dbsession)
 
     users = s.get_user_list(limit=limit)
-    result = [user.to_dict() for user in users]
-
-    send_http200_ok(req, resp, result)
+    resp.http200ok(result=users)
 
 
 def create_user(req, resp):
     s = UserService(req.dbsession)
 
     data = req.json_data
-    user = s.signup_user(data['email'], data['username'])
+    user = s.create_user(data)
 
-    send_http201_created(req, resp, location='/user/%s' % user.id)
+    resp.http201created(location='/users/%s' % user.id.hex)
 
 
 def get_user(req, resp, id):
@@ -75,20 +71,23 @@ def get_user(req, resp, id):
     if user is None:
         raise HTTP404NotFound()
 
-    result = user.to_dict()
-    send_http200_ok(req, resp, result)
+    resp.http200ok(result=user)
 
 
 def replace_user(req, resp, id):
     raise HTTP501NotImplemented()
-    # send_http200_ok(req, resp, result=None)
 
 
 def update_user(req, resp, id):
-    raise HTTP501NotImplemented()
-    # send_http200_ok(req, resp, result=None)
+    s = UserService(req.dbsession)
+    user = s.get_user(id=id)
 
 
 def delete_user(req, resp, id):
-    raise HTTP501NotImplemented()
-    # send_http200_ok(req, resp, result=None)
+    s = UserService(req.dbsession)
+    user = s.delete_user(id=id)
+
+    if user is None:
+        raise HTTP404NotFound()
+
+    resp.http204nocontent(resp)

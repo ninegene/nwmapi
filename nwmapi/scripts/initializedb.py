@@ -1,5 +1,6 @@
-from nwmapi.models.user import *
 from nwmapi.common import parse_vars, setup_logging, get_appsettings
+from nwmapi.db import Base
+from nwmapi.models.user import User
 import os
 import sys
 
@@ -29,11 +30,11 @@ def main(argv=sys.argv):
         expire_on_commit=True
     )
     Session.configure(bind=engine)
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
 
     session = Session()
-    count = session.query(User).delete()
-    print('deleted %s', count)
+
     user1 = User()
     user1.username = 'user1'
     user1.email = 'user1@nawama.com'

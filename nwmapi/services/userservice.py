@@ -31,31 +31,50 @@ class UserService(object):
 
         return q.all()
 
-    def get_user(self, id=None, username=None, email=None):
-        """Get the user instance for this information """
-        q = self.dbsession.query(User)
+    def create_user(self, dictionary=None):
+        user = User()
+        user.from_dict(dictionary)
+        signup_method = dictionary.get('signup_method', SIGNUP_METHOD_SIGNUP)
+        if user.status == USER_STATUS_INACTIVE:
+            user.activation = Activation(signup_method)
 
-        if username is not None:
-            return q.filter(User.username == username).first()
+        self.dbsession.add(user)
+        self.dbsession.commit()
+        return user
+
+    def get_user(self, id=None, username=None, email=None):
+        q = self.dbsession.query(User)
 
         if id is not None:
             return q.filter(User.id == id).first()
+
+        if username is not None:
+            return q.filter(User.username == username).first()
 
         if email is not None:
             return q.filter(User.email == email).first()
 
         return None
 
-    def signup_user(self, email, username, signup_method=SIGNUP_METHOD_SIGNUP):
-        # Get this invite party started, create a new user acct.
-        new_user = User()
-        new_user.email = email.lower()
-        new_user.username = username
-        new_user.reactivate(signup_method)
+    def delete_user(self, id=None, username=None, email=None):
+        user = None
+        q = self.dbsession.query(User)
 
-        self.dbsession.add(new_user)
+        if id is not None:
+            user = q.filter(User.id == id).first()
+
+        if username is not None:
+            user = q.filter(User.username == username).first()
+
+        if email is not None:
+            user = q.filter(User.email == email).first()
+
+        if not user:
+            return None
+
+        self.dbsession.delete(user)
         self.dbsession.commit()
-        return new_user
+        return user
 
     def activate(self, activation):
         """Remove this activation"""
@@ -89,10 +108,7 @@ class UserService(object):
             user.status = USER_STATUS_ACTIVE
             user.password = new_pass
             activation.activate()
-
-            log.debug(dict(user))
-
-            return True
+            return user
         else:
             return None
 

@@ -2,9 +2,7 @@ import ConfigParser as configparser
 import hashlib
 from logging.config import fileConfig
 import random
-import uuid
-from datetime import datetime
-from dateutil.tz import tzutc
+
 
 import os
 from paste.deploy import (
@@ -97,35 +95,3 @@ def gen_random_hash(size=32):
     return unicode(m.hexdigest()[:size])
 
 
-# See: https://www.percona.com/blog/2014/12/19/store-uuid-optimized-way/
-def ordered_uuid1():
-    """
-    Returns a UUID type 1 value, with the more constant segments of the
-    UUID at the start of the UUID. This allows us to have mostly monotonically
-    increasing UUID values, which are much better for INSERT/UPDATE performance
-    in the DB.
-
-        UUID                     = time-low "-" time-mid "-"
-                                   time-high-and-version "-"
-                                   clock-seq-and-reserved
-                                   clock-seq-low "-" node
-          time-low               = 8hexDigit
-          time-mid               = 4hexDigit
-          time-high-and-version  = 4hexDigit
-          clock-seq-and-reserved = 2hexDigit
-          clock-seq-low          = 2hexDigit
-          node                   = 12hexDigit
-
-    """
-    # 58e0a7d7-eebc-11d8-9669-0800200c9a66 => 11d8-eebc-58e0a7d7-0800200c9a66-9669
-    # 58e0a7d7 eebc 11d8 9669 0800200c9a66 => 11d8 eebc 58e0a7d7 0800200c9a66 9669
-    val = uuid.uuid1().hex
-    new_val = val[12:16] + val[8:12] + val[0:8] + val[20:] + val[16:20]
-    return uuid.UUID(new_val)
-
-
-def utcnow():
-    """
-    :return: current datetime in utc with utc timezone
-    """
-    return datetime.now(tz=tzutc())
