@@ -1,10 +1,9 @@
 from datetime import datetime
 import logging
 
-from nwmapi.db import DBSession
+from nwmapi.db import DBSession, generate_query
 from nwmapi.models.user import User, NON_ACTIVATION_AGE, Activation, USER_STATUS_INACTIVE, \
     USER_STATUS_ACTIVE, SIGNUP_METHOD_SIGNUP
-from nwmapi.services import generate_query
 
 log = logging.getLogger(__name__)
 

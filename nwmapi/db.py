@@ -2,14 +2,16 @@ from collections import OrderedDict
 import json
 import logging
 from datetime import datetime
+import uuid
+
 import dateutil.parser
 from dateutil.tz import tzutc
-from sqlalchemy import Unicode, Text, DateTime
+from nwmapi.search import create_query
+from sqlalchemy import Unicode, Text, DateTime, desc
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.types import TypeDecorator, CHAR
 from sqlalchemy.dialects.postgresql import UUID
-import uuid
 
 log = logging.getLogger(__name__)
 
@@ -306,3 +308,70 @@ def utcnow():
 #     def object_hook(self, obj):
 #         # do something based on obj
 #         return obj
+
+def jsonify(result, **kwargs):
+    if type(result) is list:
+        result = [m.to_dict() if isinstance(m, Base) else m for m in result]
+    elif isinstance(result, Base):
+        result = result.to_dict()
+    # return json.dumps(result, cls=ModelJSONEncoder, encoding='utf-8', **kwargs)
+    return json.dumps(result, encoding='utf-8', **kwargs)
+
+
+def generate_query(query, model,
+                   where=None, order_by=None, limit=None, offset=None, start=None, end=None):
+    if where:
+        query = add_where(query, model, where)
+    if order_by:
+        query = add_order_by(query, model, order_by)
+    if limit:
+        query = query.limit(int(limit))
+    if offset:
+        query = query.offset(int(offset))
+    if start or end:
+        # apply LIMIT/OFFSET to the ``Query`` based on a range
+        query = add_start_end(query, start, end)
+
+    return query
+
+
+def add_where(query, model, where):
+    if where:
+        if type(where) is list:
+            where = ','.join(where)
+        searchparams = json.loads(where)
+        query = create_query(DBSession, model, searchparams)
+
+    return query
+
+
+def add_order_by(query, model, order_by):
+    cols = []
+    if type(order_by) is str or type(order_by) is unicode:
+        if ',' in order_by:
+            cols = order_by.split(',')
+        else:
+            cols.append(order_by)
+    else:
+        cols = order_by
+    for order_by in cols:
+        if order_by.lower().endswith(' desc'):
+            query = query.order_by(desc(getattr(model, order_by.strip().split(' ')[0])))
+        elif order_by.lower().endswith(' asc'):
+            query = query.order_by(getattr(model, order_by.strip().split(' ')[0]))
+        else:
+            query = query.order_by(getattr(model, order_by))
+
+    return query
+
+
+def add_start_end(query, start, end):
+    if start:
+        start = int(start)
+    if end:
+        end = int(end)
+    if start or end:
+        # apply LIMIT/OFFSET to the ``Query`` based on a range
+        query = query.slice(start, end)
+
+    return query

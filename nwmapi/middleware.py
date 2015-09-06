@@ -5,7 +5,7 @@ import falcon
 from nwmapi.common import booleanize
 from nwmapi.httpstatus import HTTP400BadRequest, HTTP406NotAcceptable, HTTP415UnsupportedMediaType, \
     HTTP500InternalServerError
-from nwmapi.db import DBSession, Base
+from nwmapi.db import DBSession, Base, jsonify
 
 log = logging.getLogger(__name__)
 
@@ -114,21 +114,14 @@ class Response(falcon.Response):
 
         # Need to explicitly check None, since we want to pass in empty list or object
         if result is not None:
-            if self.pretty_json:
-                self.body = self._jsonify(result, indent=4, separators=(',', ': '))
-            else:
-                self.body = self._jsonify(result)
+            try:
+                if self.pretty_json:
+                    self.body = jsonify(result, indent=4, separators=(',', ': '))
+                else:
+                    self.body = jsonify(result)
+            except Exception as e:
+                log.exception(e)
+                raise HTTP500InternalServerError(
+                    title='Error converting to JSON',
+                    description='Error converting to JSON from %s' % result)
 
-    def _jsonify(self, result, **kwargs):
-        if type(result) is list:
-            result = [m.to_dict() if isinstance(m, Base) else m for m in result]
-        elif isinstance(result, Base):
-            result = result.to_dict()
-        try:
-            # return json.dumps(result, cls=ModelJSONEncoder, encoding='utf-8', **kwargs)
-            return json.dumps(result, encoding='utf-8', **kwargs)
-        except Exception as e:
-            log.exception(e)
-            raise HTTP500InternalServerError(
-                title='Error converting to JSON',
-                description='Error converting to JSON from %s' % result)
