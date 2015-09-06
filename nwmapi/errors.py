@@ -1,9 +1,7 @@
 import logging
 
 import falcon
-import nwmapi
 from nwmapi.httpstatus import HTTP400BadRequest, HTTP500InternalServerError
-import re
 
 log = logging.getLogger(__name__)
 

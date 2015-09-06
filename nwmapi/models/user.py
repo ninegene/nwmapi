@@ -108,6 +108,24 @@ class User(Base):
 
     password = synonym('_password', descriptor=property(_get_password, _set_password))
 
+    @property
+    def active(self):
+        return self.status == USER_STATUS_ACTIVE
+
+    @active.setter
+    def active(self, value):
+        if value:
+            self.status = USER_STATUS_ACTIVE
+
+    @property
+    def inactive(self):
+        return self.status == USER_STATUS_INACTIVE
+
+    @inactive.setter
+    def inactive(self, value):
+        if value:
+            self.status = USER_STATUS_INACTIVE
+
     def validate_password(self, password):
         """
         Check the password against existing credentials.
@@ -152,6 +170,10 @@ class User(Base):
             dictionary['email'] = email.lower()
         dictionary.setdefault('status', USER_STATUS_INACTIVE)
         return super(User, self).from_dict(dictionary)
+
+    @property
+    def json(self):
+        return super(User, self).to_json()
 
     def __repr__(self):
         return "<User {} {} {} {}>".format(self.username, self.email, self.role, self.status)

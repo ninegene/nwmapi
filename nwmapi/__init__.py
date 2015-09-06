@@ -1,8 +1,8 @@
 import falcon
 from nwmapi.errors import json_error_serializer, raise_unknown_url, UnknownUrl, handle_server_error
-from nwmapi.middleware import ReqRequireJSONType, ReqBodyJSONTranslator, JSONRequest, JSONResponse, \
-    DBSession
-from nwmapi.db import Base, Session
+from nwmapi.middleware import ReqRequireJSONType, ParseJSONReqBody, Request, Response, \
+    DBSessionLifeCycle, SetCORSRespHeaders, ProcessCommonReqParams
+from nwmapi.db import Base, DBSession
 from nwmapi.resources.users import UserResource, UserListResource
 from sqlalchemy import engine_from_config
 
@@ -11,7 +11,7 @@ def main(global_config, **settings):
     """ This function returns a WSGI application.
     """
     engine = engine_from_config(settings, 'sqlalchemy.')
-    Session.configure(bind=engine)
+    DBSession.configure(bind=engine)
     Base.metadata.bind = engine
     Base.metadata.create_all()
 
@@ -28,17 +28,19 @@ def main(global_config, **settings):
         # to the error type. If the type matches a registered error handler, that handler will be invoked
         # and then the framework will begin to unwind the stack, skipping any lower layers.
         middleware=[
-            DBSession(),
+            DBSessionLifeCycle(),
             ReqRequireJSONType(),
-            ReqBodyJSONTranslator(),
+            ProcessCommonReqParams(),
+            ParseJSONReqBody(),
+            SetCORSRespHeaders(),
         ],
 
         # ``Request``-like class to use instead of Falcon's default class. Among other things,
         # this feature affords inheriting from ``falcon.request.Request`` in order
         # to override the ``context_type`` class variable.
         # (default ``falcon.request.Request``)
-        request_type=JSONRequest,
-        response_type=JSONResponse,
+        request_type=Request,
+        response_type=Response,
     )
 
     app.set_error_serializer(json_error_serializer)
@@ -49,9 +51,6 @@ def main(global_config, **settings):
 
 
 def add_routes(app):
-    user = UserResource()
-    users = UserListResource()
-
     # The router treats URI paths as a tree of URI segments and searches by
     # checking the URI one segment at a time. Instead of interpreting the route
     # tree for each look-up, it generates inlined, bespoke Python code to
@@ -80,8 +79,8 @@ def add_routes(app):
     app.add_sink(raise_unknown_url)
     app.add_route('/', UnknownUrl())
 
-    app.add_route('/users', users)
-    app.add_route('/users/{id}', user)
+    app.add_route(UserListResource.__uri__, UserListResource())
+    app.add_route(UserResource.__uri__, UserResource())
 
     # If a responder ever raised an instance of Exception, pass control to the given handler.
     app.add_error_handler(Exception, handle_server_error)

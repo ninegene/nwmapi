@@ -23,21 +23,21 @@ class Base(object):
         return cls.__table__.primary_key.columns.values()[0].name
 
     def to_dict(self, excluded_columns=set(), included_columns=set()):
-        include_all_cols = included_columns is None or len(included_columns) == 0
-        result = OrderedDict()
-        for col in self.__table__.columns.keys():
-            if include_all_cols or col in included_columns:
-                if col in excluded_columns:
-                    continue
+        columns = self.__table__.columns.keys()
+        if included_columns is None or len(included_columns) == 0:
+            included_columns = set(columns)
 
-                val = getattr(self, col, None)
-                if type(val) is uuid.UUID:
-                    result[col] = val.hex
-                elif type(val) is datetime:
-                    val = val.replace(microsecond=0)
-                    result[col] = val.isoformat()
-                else:
-                    result[col] = getattr(self, col, None)
+        result = OrderedDict()
+        for col in columns:
+            val = getattr(self, col, None)
+            if type(val) is uuid.UUID:
+                val = val.hex
+            elif type(val) is datetime:
+                # val = val.replace(microsecond=0)
+                # val = val.isoformat()
+                val = val.strftime('%Y-%m-%dT%H:%M:%SZ')
+            if col in included_columns and col not in excluded_columns:
+                result[col] = val
         return result
 
     def from_dict(self, dictionary):
@@ -47,9 +47,25 @@ class Base(object):
             val = dictionary.get(col, None)
             if coltype is DateTime or coltype is UTCDateTime:
                 val = dateutil.parser.parse(val)
-
             if val:
                 setattr(self, col, val)
+
+    def to_json(self, excluded_columns=set(), included_columns=set()):
+        # subclass could override to_dict with only 'excluded_columns' kv pair
+        if excluded_columns and included_columns:
+            dictionary = self.to_dict(excluded_columns=excluded_columns, included_columns=included_columns)
+        elif excluded_columns:
+            dictionary = self.to_dict(excluded_columns=excluded_columns)
+        elif included_columns:
+            dictionary = self.to_dict(included_columns=included_columns)
+        else:
+            dictionary = self.to_dict()
+        # return json.dumps(dictionary, cls=ModelJSONEncoder, encoding='utf-8')
+        return json.dumps(dictionary, encoding='utf-8')
+
+    def from_json(self, json_str):
+        dictionary = json.loads(json_str, encoding='utf-8')
+        self.from_dict(dictionary)
 
     def replace(self, dictionary):
         dictionary = dictionary or {}
@@ -92,13 +108,12 @@ Base.metadata.naming_convention = {
 # scoped_session() maintains a reference to the same session object for instances of Session.
 
 # Session is a session factory class that create session instance to persist and load objects from db.
-Session = sessionmaker(  # invokes sessionmaker.__call__() to create and instance of Session class
-                         autoflush=True,
-                         autocommit=False,
-                         expire_on_commit=True
-                         )
-
-dbsession = scoped_session(Session)
+# sessionmaker invokes sessionmaker.__call__() to create and instance of Session class
+DBSession = scoped_session(sessionmaker(
+    autoflush=True,
+    autocommit=False,
+    expire_on_commit=True
+))
 
 # @contextmanager
 # def transactional_dbsession():
@@ -229,56 +244,65 @@ def utcnow():
     return datetime.now(tz=tzutc())
 
 
-class JSONEncoder(json.JSONEncoder):
-    """Extend the default JSONEncoder to support ``datetime`` and ``UUID`` as JSON string.
+# class ModelJSONEncoder(json.JSONEncoder):
+#     """Extend the default JSONEncoder to support ``datetime`` and ``UUID`` as JSON string.
+#
+#     json.JSONEncoder supports the following objects and types by default:
+#
+#     +-------------------+---------------+
+#     | Python            | JSON          |
+#     +===================+===============+
+#     | dict              | object        |
+#     +-------------------+---------------+
+#     | list, tuple       | array         |
+#     +-------------------+---------------+
+#     | str, unicode      | string        |
+#     +-------------------+---------------+
+#     | int, long, float  | number        |
+#     +-------------------+---------------+
+#     | True              | true          |
+#     +-------------------+---------------+
+#     | False             | false         |
+#     +-------------------+---------------+
+#     | None              | null          |
+#     +-------------------+---------------+
+#
+#     To extend this to recognize other objects, subclass and implement a
+#     ``.default()`` method with another method that returns a serializable
+#     object for ``o`` if possible, otherwise it should call the superclass
+#     implementation (to raise ``TypeError``).
+#
+#     """
+#
+#     def default(self, o):
+#         """Implement this method in a subclass such that it returns a
+#         serializable object for ``o``, or calls the base implementation (to
+#         raise a ``TypeError``).
+#
+#         For example, to support arbitrary iterators, you could implement
+#         default like this::
+#
+#             def default(self, o):
+#                 try:
+#                     iterable = iter(o)
+#                 except TypeError:
+#                     pass
+#                 else:
+#                     return list(iterable)
+#                 return JSONEncoder.default(self, o)
+#         """
+#         if type(o) is uuid.UUID:
+#             return o.hex
+#         elif type(o) is datetime:
+#             o = o.replace(microsecond=0)
+#             return o.isoformat()
+#         return json.JSONEncoder.default(self, o)
 
-    json.JSONEncoder supports the following objects and types by default:
 
-    +-------------------+---------------+
-    | Python            | JSON          |
-    +===================+===============+
-    | dict              | object        |
-    +-------------------+---------------+
-    | list, tuple       | array         |
-    +-------------------+---------------+
-    | str, unicode      | string        |
-    +-------------------+---------------+
-    | int, long, float  | number        |
-    +-------------------+---------------+
-    | True              | true          |
-    +-------------------+---------------+
-    | False             | false         |
-    +-------------------+---------------+
-    | None              | null          |
-    +-------------------+---------------+
-
-    To extend this to recognize other objects, subclass and implement a
-    ``.default()`` method with another method that returns a serializable
-    object for ``o`` if possible, otherwise it should call the superclass
-    implementation (to raise ``TypeError``).
-
-    """
-
-    def default(self, o):
-        """Implement this method in a subclass such that it returns a
-        serializable object for ``o``, or calls the base implementation (to
-        raise a ``TypeError``).
-
-        For example, to support arbitrary iterators, you could implement
-        default like this::
-
-            def default(self, o):
-                try:
-                    iterable = iter(o)
-                except TypeError:
-                    pass
-                else:
-                    return list(iterable)
-                return JSONEncoder.default(self, o)
-        """
-        if type(o) is uuid.UUID:
-            return o.hex
-        elif type(o) is datetime:
-            o = o.replace(microsecond=0)
-            return o.isoformat()
-        return json.JSONEncoder.default(self, o)
+# class ModelJSONDecoder(json.JSONDecoder):
+#     def __init__(self, *args, **kwargs):
+#         json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+#
+#     def object_hook(self, obj):
+#         # do something based on obj
+#         return obj

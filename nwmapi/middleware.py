@@ -2,35 +2,35 @@ import logging
 import json
 
 import falcon
+from nwmapi.common import booleanize
 from nwmapi.httpstatus import HTTP400BadRequest, HTTP406NotAcceptable, HTTP415UnsupportedMediaType, \
     HTTP500InternalServerError
-from nwmapi.db import dbsession, JSONEncoder, Base
+from nwmapi.db import DBSession, Base
 
 log = logging.getLogger(__name__)
 
 
-class DBSession(object):
+class DBSessionLifeCycle(object):
     def process_request(self, req, resp):
-        log_debug(req, 'DBSession: before request')
-        req.dbsession = dbsession
+        log_debug(req, 'DBSessionLifeCycle: before routing request')
 
     def process_response(self, req, resp, resource):
-        log_debug(req, 'DBSession: after response')
-        req.dbsession.close()
+        log_debug(req, 'DBSessionLifeCycle: after processing response')
+        DBSession.close()
 
 
-class RespCORSHeaders(object):
+class SetCORSRespHeaders(object):
     def process_response(self, req, resp, resource):
-        log_debug(req, 'RespCORSHeaders: after response')
+        log_debug(req, 'SetCORSRespHeaders: after processing response')
         # http://stackoverflow.com/questions/10636611/how-does-access-control-allow-origin-header-work
         # http://stackoverflow.com/questions/24687313/what-exactly-does-the-access-control-allow-credentials-header-do
-        resp.headers['Access-Control-Allow-Origin'] = 'nawama.com'
-        resp.headers['Access-Control-Allow-Credentials'] = 'true'
+        resp.set_header('Access-Control-Allow-Origin', '*')
+        resp.set_header('Access-Control-Allow-Credentials', 'true')
 
 
 class ReqRequireJSONType(object):
     def process_request(self, req, resp):
-        log_debug(req, 'RequireJSONType: before request')
+        log_debug(req, 'RequireJSONType: before routing request')
         if not req.client_accepts_json:
             raise HTTP406NotAcceptable('Unsupported response encoding', href='https://url/to/docs')
 
@@ -39,9 +39,17 @@ class ReqRequireJSONType(object):
                 raise HTTP415UnsupportedMediaType('Unsupported content type', href='https://url/to/docs')
 
 
-class ReqBodyJSONTranslator(object):
+class ProcessCommonReqParams(object):
     def process_request(self, req, resp):
-        log_debug(req, 'ReqBodyJSONTranslator: before request')
+        log_debug(req, 'ParseCommonReqParams: before routing request')
+        resp.pretty_json = booleanize(req.params.get('pretty', False))
+        if 'pretty' not in req.params and 'pretty' in req.query_string.split('&'):
+            resp.pretty_json = True
+
+
+class ParseJSONReqBody(object):
+    def process_request(self, req, resp):
+        log_debug(req, 'ParseJSONReqBody: before routing request')
         # req.stream corresponds to the WSGI wsgi.input environ variable,
         # and allows you to read bytes form the request body
         #
@@ -72,20 +80,21 @@ def log_debug(req, msg):
     log.debug('%s %s %s %s', msg, req.protocol.upper(), req.method, req.relative_uri)
 
 
-class JSONRequest(falcon.Request):
+class Request(falcon.Request):
     """Override falcon.Request to provide 'body' and 'json_data' attribute on request object"""
 
     def __init__(self, env, options=None):
-        super(JSONRequest, self).__init__(env, options)
+        super(Request, self).__init__(env, options)
         self.body = None
         self.json_data = None
 
 
-class JSONResponse(falcon.Response):
+class Response(falcon.Response):
     """Override falcon.Response to provide wrapper methods to return 2xx status and result"""
 
     def __init__(self):
-        super(JSONResponse, self).__init__()
+        self.pretty_json = False
+        super(Response, self).__init__()
 
     def http200ok(self, result=None):
         self._send_json(falcon.HTTP_200, result)
@@ -105,7 +114,10 @@ class JSONResponse(falcon.Response):
 
         # Need to explicitly check None, since we want to pass in empty list or object
         if result is not None:
-            self.body = self._jsonify(result)
+            if self.pretty_json:
+                self.body = self._jsonify(result, indent=4, separators=(',', ': '))
+            else:
+                self.body = self._jsonify(result)
 
     def _jsonify(self, result, **kwargs):
         if type(result) is list:
@@ -113,7 +125,8 @@ class JSONResponse(falcon.Response):
         elif isinstance(result, Base):
             result = result.to_dict()
         try:
-            return json.dumps(result, cls=JSONEncoder, encoding='utf-8', **kwargs)
+            # return json.dumps(result, cls=ModelJSONEncoder, encoding='utf-8', **kwargs)
+            return json.dumps(result, encoding='utf-8', **kwargs)
         except Exception as e:
             log.exception(e)
             raise HTTP500InternalServerError(

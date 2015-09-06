@@ -95,3 +95,15 @@ def gen_random_hash(size=32):
     return unicode(m.hexdigest()[:size])
 
 
+def booleanize(val):
+    if type(val) is str or type(val) is unicode:
+        val = val.lower()
+        if val in ('y', 'yes', 'true', 'on', '1'):
+            return True
+        elif val in ('n', 'no', 'false', 'off', '0'):
+            return False
+        else:
+            return False
+            # raise ValueError("invalid truth value %r" % (val,))
+
+    return True if val else False

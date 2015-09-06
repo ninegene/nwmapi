@@ -19,7 +19,9 @@ log = logging.getLogger(__name__)
 
 
 class UserListResource(BaseHandler):
-    @falcon.before(require_query_param('limit'))
+    __uri__ = '/users'
+
+    # @falcon.before(require_query_param('limit'))
     def on_get(self, req, resp):
         get_user_list(req, resp)
 
@@ -29,6 +31,8 @@ class UserListResource(BaseHandler):
 
 
 class UserResource(BaseHandler):
+    __uri__ = '/users/{id}'
+
     @falcon.before(require_path_param('id'))
     def on_get(self, req, resp, id):
         get_user(req, resp, id)
@@ -48,25 +52,33 @@ class UserResource(BaseHandler):
 
 
 def get_user_list(req, resp):
-    limit = req.params['limit']
-    s = UserService(req.dbsession)
+    where = req.params.get('where', None)
+    order_by = req.params.get('order_by', None)
+    limit = req.params.get('limit', None)
+    offset = req.params.get('offset', None)
+    start = req.params.get('start', None)
+    end = req.params.get('end', None)
 
-    users = s.get_user_list(limit=limit)
+    service = UserService()
+    users = service.get_user_list(where=where,
+                                  order_by=order_by,
+                                  limit=limit, offset=offset, start=start, end=end)
+
     resp.http200ok(result=users)
 
 
 def create_user(req, resp):
-    s = UserService(req.dbsession)
-
     data = req.json_data
-    user = s.create_user(data)
 
-    resp.http201created(location='/users/%s' % user.id.hex)
+    service = UserService()
+    user = service.create_user(data)
+
+    resp.http201created(location='/users/%s' % user.id.hex, result=user)
 
 
 def get_user(req, resp, id):
-    s = UserService(req.dbsession)
-    user = s.get_user(id=id)
+    service = UserService()
+    user = service.get_user(id=id)
 
     if user is None:
         raise HTTP404NotFound()
@@ -79,15 +91,19 @@ def replace_user(req, resp, id):
 
 
 def update_user(req, resp, id):
-    s = UserService(req.dbsession)
-    user = s.get_user(id=id)
+    data = req.json_data
+
+    service = UserService()
+    user = service.update_user(data, id=id)
+
+    resp.http200ok(result=user)
 
 
 def delete_user(req, resp, id):
-    s = UserService(req.dbsession)
-    user = s.delete_user(id=id)
+    service = UserService()
+    user = service.delete_user(id=id)
 
     if user is None:
         raise HTTP404NotFound()
 
-    resp.http204nocontent(resp)
+    resp.http204nocontent()
