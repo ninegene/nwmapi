@@ -45,7 +45,7 @@ class UserService(object):
     def update_user(self, dictionary, id=None, username=None, email=None):
         user = self.get_user(id=id, username=username, email=email)
         user.from_dict(dictionary)
-        DBSession.add(user)
+        DBSession.merge(user)
         DBSession.commit()
         return user
 
@@ -54,13 +54,13 @@ class UserService(object):
         q = DBSession.query(User)
 
         if id is not None:
-            user = q.filter(User.id == id).first()
+            user = q.filter(User.id == id).one()
 
         if username is not None:
-            user = q.filter(User.username == username).first()
+            user = q.filter(User.username == username).one()
 
         if email is not None:
-            user = q.filter(User.email == email).first()
+            user = q.filter(User.email == email).one()
 
         if not user:
             return None

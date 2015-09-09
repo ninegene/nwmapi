@@ -1,8 +1,9 @@
 import logging
 
 import falcon
-from nwmapi.hooks import require_json_keys, require_query_param, require_path_param
+from nwmapi.hooks import require_path_param, validate_fields
 from nwmapi.httpstatus import HTTP404NotFound, HTTP501NotImplemented
+from nwmapi.models.user import User
 from nwmapi.resources import BaseHandler
 from nwmapi.services.userservice import UserService
 
@@ -10,41 +11,42 @@ log = logging.getLogger(__name__)
 
 
 # Method         HTTP method   URL
-# get_users()    GET           /users
-# create_user()  POST          /users
-# get_user()     GET           /users/<id>
-# replace_user() PUT           /users/<id>
-# update_user()  POST          /users/<id>
-# delete_user()  DELETE        /users/<id>
+# get_user_list()    GET           /users
+# create_user()      POST          /users
+# get_user()         GET           /users/<id>
+# update_user()      PATCH         /users/<id>
+# replace_user()     PUT           /users/<id>
+# delete_user()      DELETE        /users/<id>
 
 
 class UserListResource(BaseHandler):
-    __uri__ = '/users'
+    #: The relative URL this resource should live at.
+    __url__ = '/users'
 
     # @falcon.before(require_query_param('limit'))
     def on_get(self, req, resp):
         get_user_list(req, resp)
 
-    @falcon.before(require_json_keys('username', 'email'))
+    @falcon.before(validate_fields(User))
     def on_post(self, req, resp):
         create_user(req, resp)
 
 
 class UserResource(BaseHandler):
-    __uri__ = '/users/{id}'
+    __url__ = '/users/{id}'
 
     @falcon.before(require_path_param('id'))
     def on_get(self, req, resp, id):
         get_user(req, resp, id)
 
     @falcon.before(require_path_param('id'))
-    def on_put(self, req, resp, id):
+    def on_patch(self, req, resp, id):
         update_user(req, resp, id)
 
     @falcon.before(require_path_param('id'))
-    @falcon.before(require_json_keys('username', 'email'))
-    def on_post(self, req, resp, id):
-        replace_user(req, resp, id)
+    @falcon.before(validate_fields(User))
+    def on_put(self, req, resp, id):
+        update_user(req, resp, id)
 
     @falcon.before(require_path_param('id'))
     def on_delete(self, req, resp, id):
@@ -84,10 +86,6 @@ def get_user(req, resp, id):
         raise HTTP404NotFound()
 
     resp.http200ok(result=user)
-
-
-def replace_user(req, resp, id):
-    raise HTTP501NotImplemented()
 
 
 def update_user(req, resp, id):

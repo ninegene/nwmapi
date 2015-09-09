@@ -124,4 +124,3 @@ class Response(falcon.Response):
                 raise HTTP500InternalServerError(
                     title='Error converting to JSON',
                     description='Error converting to JSON from %s' % result)
-

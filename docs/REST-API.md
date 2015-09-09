@@ -31,6 +31,7 @@ Based on:
 * https://www.dropbox.com/developers/core/docs#error-handling
 
 ## Learn REST API
+* http://restful-api-design.readthedocs.org/en/latest/methods.html
 * https://parse.com/docs/rest/guide/
 * http://www.restapitutorial.com/httpstatuscodes.html
 

@@ -62,7 +62,7 @@ class HTTP400BadRequest(falcon.HTTPBadRequest):
         super(HTTP400BadRequest, self).__init__(title, description, **kwargs)
 
 
-class HTTP400MissingParam(falcon.HTTPMissingParam):
+class HTTP400MissingRequiredParam(falcon.HTTPMissingParam):
     """A parameter is missing from the request. Inherits from ``HTTPBadRequest``.
 
     This error may refer to a parameter in a query string, form, or
@@ -75,7 +75,7 @@ class HTTP400MissingParam(falcon.HTTPMissingParam):
     """
 
     def __init__(self, param_name, **kwargs):
-        super(HTTP400MissingParam, self).__init__(param_name, **kwargs)
+        super(HTTP400MissingRequiredParam, self).__init__(param_name, **kwargs)
 
 
 class HTTP400InvalidParam(falcon.HTTPInvalidParam):
@@ -91,8 +91,8 @@ class HTTP400InvalidParam(falcon.HTTPInvalidParam):
 
     """
 
-    def __init__(self, msg, param_name, **kwargs):
-        super(HTTP400InvalidParam, self).__init__(msg, param_name, **kwargs)
+    def __init__(self, param_name, **kwargs):
+        super(HTTP400InvalidParam, self).__init__("", param_name, **kwargs)
 
 
 class HTTP403Forbidden(falcon.HTTPForbidden):
@@ -119,23 +119,16 @@ class HTTP403Forbidden(falcon.HTTPForbidden):
         super(HTTP403Forbidden, self).__init__(title, description, **kwargs)
 
 
-class HTTP404NotFound(falcon.HTTPError):
+class HTTP404NotFound(falcon.HTTPNotFound):
     """404 Not Found.
 
     Use this when the URL path does not map to an existing resource, or you
     do not wish to disclose exactly why a request was refused.
 
-    Args:
-        title (str): Error title (e.g., 'Request Body Limit Exceeded').
-        description (str): Human-friendly description of the error, along with
-            a helpful suggestion or two.
-        kwargs (optional): Same as for ``HTTPError``.
-
     """
 
-    def __init__(self, title=None, description=None, **kwargs):
-        title = title or '404 Not Found'
-        super(HTTP404NotFound, self).__init__(HTTP_404, title, description, **kwargs)
+    def __init__(self, **kwargs):
+        super(HTTP404NotFound, self).__init__(**kwargs)
 
 
 class HTTP405MethodNotAllowed(falcon.HTTPMethodNotAllowed):

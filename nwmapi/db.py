@@ -21,10 +21,43 @@ class Base(object):
     """
 
     @classmethod
-    def primary_key(cls):
-        return cls.__table__.primary_key.columns.values()[0].name
+    def required(cls):
+        """Return a list of all columns required by the database to create the
+        resource.
+
+        :param cls: The Model class to gather attributes from
+        :rtype: list
+        """
+        columns = []
+        for column in cls.__table__.columns:
+            if not column.nullable:
+                columns.append(column.name)
+        return columns
+
+    @classmethod
+    def optional(cls):
+        """Return a list of all nullable columns for the resource's table.
+
+        :rtype: list
+        """
+        columns = []
+        for column in cls.__table__.columns:
+            if column.nullable:
+                columns.append(column.name)
+        return columns
+
+    def primary_key(self):
+        """Return the name of the model's primary key field.
+
+        :rtype: string
+        """
+        return list(self.__table__.primary_key.columns)[0].name
 
     def to_dict(self, excluded_columns=set(), included_columns=set()):
+        """Return the resource as a dictionary.
+
+        :rtype: dict
+        """
         columns = self.__table__.columns.keys()
         if included_columns is None or len(included_columns) == 0:
             included_columns = set(columns)
@@ -37,7 +70,8 @@ class Base(object):
             elif type(val) is datetime:
                 # val = val.replace(microsecond=0)
                 # val = val.isoformat()
-                val = val.strftime('%Y-%m-%dT%H:%M:%SZ')
+                val = val.strftime('%Y-%m-%dT%H:%M:%S.%f')
+                val = val[:-3] + 'Z'
             if col in included_columns and col not in excluded_columns:
                 result[col] = val
         return result
@@ -45,9 +79,10 @@ class Base(object):
     def from_dict(self, dictionary):
         dictionary = dictionary or {}
         for col in self.__table__.columns.keys():
-            coltype = self.__table__.columns._data[col].type
             val = dictionary.get(col, None)
-            if coltype is DateTime or coltype is UTCDateTime:
+            coltype = self.__table__.columns._data[col].type
+            valtype = type(val)
+            if (valtype is str or valtype is unicode) and (coltype is DateTime or coltype is UTCDateTime):
                 val = dateutil.parser.parse(val)
             if val:
                 setattr(self, col, val)
@@ -76,13 +111,20 @@ class Base(object):
         self.from_dict(dictionary)
 
     @classmethod
-    def meta(cls):
-        """Return a dictionary containing meta-information about the model."""
-        attribute_info = {}
-        for name, value in cls.__table__.columns.items():
-            attribute_info[name] = str(value.type).lower()
+    def description(cls):
+        """Return a field->data type dictionary describing this model
+        as reported by the database.
 
-        return {cls.__name__: attribute_info}
+        :rtype: dict
+        """
+
+        description = OrderedDict()
+        for column in cls.__table__.columns:
+            column_description = str(column.type)
+            if not column.nullable:
+                column_description += ' (required)'
+            description[column.name] = column_description
+        return description
 
     def __str__(self):
         return str(getattr(self, self.primary_key()))
@@ -339,6 +381,7 @@ def add_where(query, model, where):
     if where:
         if type(where) is list:
             where = ','.join(where)
+        # todo: convert from Parse like quries to flask-restless like filter objects
         searchparams = json.loads(where)
         query = create_query(DBSession, model, searchparams)
 

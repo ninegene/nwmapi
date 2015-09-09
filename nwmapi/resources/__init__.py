@@ -2,7 +2,37 @@ import logging
 
 log = logging.getLogger(__name__)
 
+HTTP_METHODS = (
+    'CONNECT',
+    'DELETE',
+    'GET',
+    'HEAD',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+    'TRACE',
+)
 
 class BaseHandler(object):
-    def on_options(self, req, resp):
-        resp.http204nocontent(resp)
+    #: The relative URL this resource should live at.
+    __url__ = None
+
+    def on_options(self, req, resp, **kwargs):
+        allowed_methods = []
+
+        for method in HTTP_METHODS:
+            try:
+                responder = getattr(self, 'on_' + method.lower())
+            except AttributeError:
+                # resource does not implement this method
+                pass
+            else:
+                # Usually expect a method, but any callable will do
+                if callable(responder):
+                    allowed_methods.append(method)
+
+        allowed = ', '.join(allowed_methods)
+
+        resp.set_header('Allow', allowed)
+        resp.http204nocontent()

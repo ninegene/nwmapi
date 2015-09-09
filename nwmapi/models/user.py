@@ -41,9 +41,9 @@ class User(Base):
     __tablename__ = u'user'
 
     id = Column(GUID, default=ordered_uuid1, primary_key=True)
-    username = Column(CoerceUTF8(255), unique=True)
-    _password = Column('password', CoerceUTF8(60))
-    email = Column(String(255), unique=True)
+    username = Column(CoerceUTF8(255), unique=True, nullable=False)
+    email = Column(String(255), unique=True, nullable=False)
+    _password = Column('password', CoerceUTF8(255))
     fullname = Column(CoerceUTF8(255))
     about_me = Column(CoerceUTF8)
     phone = Column(String)
@@ -86,17 +86,16 @@ class User(Base):
         hashed_password = password
 
         if isinstance(password, unicode):
-            password_8bit = password.encode('UTF-8')
+            pw = password.encode('UTF-8')
         else:
-            password_8bit = password
+            pw = password
 
         # Hash a password for the first time, with a randomly-generated salt
         salt = bcrypt.gensalt(10)
-        hashed_password = bcrypt.hashpw(password_8bit, salt)
+        hashed_password = bcrypt.hashpw(pw, salt)
 
         # Make sure the hased password is an UTF-8 object at the end of the
-        # process because SQLAlchemy _wants_ a unicode object for Unicode
-        # fields
+        # process because SQLAlchemy _wants_ a unicode object for Unicode fields
         if not isinstance(hashed_password, unicode):
             hashed_password = hashed_password.decode('UTF-8')
 

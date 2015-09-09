@@ -1,7 +1,7 @@
 import logging
 
 from nwmapi.httpstatus import HTTP400InvalidParam, HTTP413RequestEntityTooLarge, HTTP400BadRequest, \
-    HTTP400MissingParam
+    HTTP400MissingRequiredParam
 import re
 
 log = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ def require_path_param(*args):
         log.debug('require_path_param %s', params)
         for name in args:
             if name not in params:
-                raise HTTP400MissingParam(name)
+                raise HTTP400MissingRequiredParam(name)
             if name == 'id':
                 check_id(params)
 
@@ -29,7 +29,7 @@ def require_query_param(*args):
         log.debug('require_query_param %s', req.params)
         for name in args:
             if name not in req.params:
-                raise HTTP400MissingParam(name)
+                raise HTTP400MissingRequiredParam(name)
 
     return hook
 
@@ -48,21 +48,36 @@ def _check_req_body_exists(req):
                                 'A valid JSON document is required.')
 
 
-def require_json_keys(*argv):
+def require_json_fields(*argv):
     def hook(req, resp, resource, params):
         log.debug('require_json_req %s', argv)
         _check_req_body_exists(req)
 
         data = req.json_data
 
-        if argv is not None:
-            for key in argv:
-                check_exists(key, data)
+        for key in argv:
+            if key not in data:
+                raise HTTP400MissingRequiredParam(key)
 
-    def check_exists(key, data):
-        if key not in data:
-            raise HTTP400MissingParam(key)
+    return hook
 
+
+def validate_fields(model):
+    def hook(req, resp, resource, params):
+        log.debug('validate_fields')
+        _check_req_body_exists(req)
+
+        data = req.json_data
+
+        required_fields = model.required()
+        all_fields = required_fields + model.optional()
+
+        for key in data:
+            if key not in all_fields:
+                raise HTTP400InvalidParam(key)
+        for required in set(model.required()):
+            if required not in data:
+                raise HTTP400MissingRequiredParam(required)
     return hook
 
 
