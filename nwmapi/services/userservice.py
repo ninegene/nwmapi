@@ -1,27 +1,30 @@
 from datetime import datetime
 import logging
+from nwmapi.common import booleanize
 
 from nwmapi.db import DBSession, generate_query
-from nwmapi.models.user import User, NON_ACTIVATION_AGE, Activation, USER_STATUS_INACTIVE, \
-    USER_STATUS_ACTIVE, SIGNUP_METHOD_SIGNUP
+from nwmapi.models.user import User, NON_ACTIVATION_AGE, Activation, USER_STATUS_DISABLED, \
+    USER_STATUS_ENABLED, SIGNUP_METHOD_SIGNUP
 
 log = logging.getLogger(__name__)
 
 
 class UserService(object):
-    def get_user_list(self, where=None, order_by=None, limit=None, offset=None, start=None, end=None):
-        q = DBSession.query(User)
-        q = generate_query(q, User,
-                           where=where,
+    def get_user_list(self, filters=None, order_by=None, limit=None, offset=None, start=None, end=None,
+                      single=None):
+        q = generate_query(User,
+                           filters=filters,
                            order_by=order_by,
                            limit=limit, offset=offset, start=start, end=end)
+        if booleanize(single):
+            return q.first()
         return q.all()
 
     def create_user(self, dictionary=None):
         user = User()
         user.from_dict(dictionary)
         signup_method = dictionary.get('signup_method', SIGNUP_METHOD_SIGNUP)
-        if user.status == USER_STATUS_INACTIVE:
+        if user.status == USER_STATUS_DISABLED:
             user.activation = Activation(signup_method)
 
         DBSession.add(user)
@@ -44,24 +47,16 @@ class UserService(object):
 
     def update_user(self, dictionary, id=None, username=None, email=None):
         user = self.get_user(id=id, username=username, email=email)
+        if not user:
+            return None
+
         user.from_dict(dictionary)
         DBSession.merge(user)
         DBSession.commit()
         return user
 
     def delete_user(self, id=None, username=None, email=None):
-        user = None
-        q = DBSession.query(User)
-
-        if id is not None:
-            user = q.filter(User.id == id).one()
-
-        if username is not None:
-            user = q.filter(User.username == username).one()
-
-        if email is not None:
-            user = q.filter(User.email == email).one()
-
+        user = self.get_user(id=id, username=username, email=email)
         if not user:
             return None
 
@@ -98,7 +93,7 @@ class UserService(object):
 
         if self.acceptable_password(new_pass) and activation is not None:
             user = activation.user
-            user.status = USER_STATUS_ACTIVE
+            user.status = USER_STATUS_ENABLED
             user.password = new_pass
             activation.activate()
             return user
@@ -128,7 +123,7 @@ class UserService(object):
             subquery(name="query")
 
         user_query = DBSession.query(User). \
-            filter(User.status == USER_STATUS_INACTIVE). \
+            filter(User.status == USER_STATUS_DISABLED). \
             filter(User.id.in_(subquery))
 
         # Delete the non activated accounts only if it is asked to.

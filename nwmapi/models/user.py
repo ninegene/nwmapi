@@ -23,10 +23,9 @@ USER_ROLE_CONSUMER = 'consumer'
 USER_ROLE_BUSINESS = 'business'
 USER_ROLE_ADMIN = 'admin'
 
-USER_STATUS_ACTIVE = 'active'
-USER_STATUS_INACTIVE = 'inactive'
-USER_STATUS_SUSPENDED = 'suspended'
-USER_STATUS_CLOSED = 'closed'
+USER_STATUS_ENABLED = 'ENABLED'
+USER_STATUS_DISABLED = 'DISABLED'
+USER_STATUS_UNVERIFIED = 'UNVERIFIED'
 
 ACTIVATION_AGE = timedelta(days=3)
 NON_ACTIVATION_AGE = timedelta(days=30)
@@ -44,7 +43,9 @@ class User(Base):
     username = Column(CoerceUTF8(255), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     _password = Column('password', CoerceUTF8(255))
-    fullname = Column(CoerceUTF8(255))
+    firstname = Column(CoerceUTF8(255))
+    middlename = Column(CoerceUTF8(255))
+    lastname = Column(CoerceUTF8(255))
     about_me = Column(CoerceUTF8)
     phone = Column(String)
     location = Column(CoerceUTF8(255))
@@ -55,11 +56,10 @@ class User(Base):
              USER_ROLE_ADMIN),
         default=USER_ROLE_CONSUMER)
     status = Column(
-        Enum(USER_STATUS_ACTIVE,
-             USER_STATUS_INACTIVE,
-             USER_STATUS_SUSPENDED,
-             USER_STATUS_CLOSED),
-        default=USER_STATUS_INACTIVE)
+        Enum(USER_STATUS_ENABLED,
+             USER_STATUS_DISABLED,
+             USER_STATUS_UNVERIFIED),
+        default=USER_STATUS_UNVERIFIED)
     activation = relationship(
         'Activation',
         cascade="all, delete, delete-orphan",
@@ -79,11 +79,11 @@ class User(Base):
     def __init__(self):
         """By default a user starts out deactivated"""
         self.activation = Activation()
-        self.status = USER_STATUS_INACTIVE
+        self.status = USER_STATUS_UNVERIFIED
 
     def _set_password(self, password):
         """Hash password on the fly."""
-        hashed_password = password
+        # hashed_password = password
 
         if isinstance(password, unicode):
             pw = password.encode('UTF-8')
@@ -108,22 +108,29 @@ class User(Base):
     password = synonym('_password', descriptor=property(_get_password, _set_password))
 
     @property
+    def fullName(self):
+        firstName = self.firstname or ''
+        middleName = self.middlename or ''
+        lastName = self.lastname or ''
+        return firstName.strip() + ' ' + middleName.strip() + ' ' + lastName.strip()
+
+    @property
     def active(self):
-        return self.status == USER_STATUS_ACTIVE
+        return self.status == USER_STATUS_ENABLED
 
     @active.setter
     def active(self, value):
         if value:
-            self.status = USER_STATUS_ACTIVE
+            self.status = USER_STATUS_ENABLED
 
     @property
     def inactive(self):
-        return self.status == USER_STATUS_INACTIVE
+        return self.status == USER_STATUS_DISABLED
 
     @inactive.setter
     def inactive(self, value):
         if value:
-            self.status = USER_STATUS_INACTIVE
+            self.status = USER_STATUS_DISABLED
 
     def validate_password(self, password):
         """
@@ -142,24 +149,13 @@ class User(Base):
         else:
             return False
 
-    def deactivate(self):
-        """In case we need to disable the login"""
-        self.status = USER_STATUS_INACTIVE
-
-    def reactivate(self, creator):
-        """Put the account through the reactivation process
-
-        This can come about via a signup or from forgotten password link
-
-        """
-        # if we reactivate then reinit this
-        self.activation = Activation(creator)
-        self.status = USER_STATUS_INACTIVE
-
-    def to_dict(self, excluded_columns=set()):
-        excluded_columns = excluded_columns | {'password'}
-        result = super(User, self).to_dict(excluded_columns=excluded_columns)
-        result['activation'] = self.activation.to_dict(excluded_columns={'user_id'})
+    def to_dict(self, excluded=None, included=None):
+        excluded = excluded or set()
+        excluded = excluded | {'password'}   # always exclude password
+        included = included or set()
+        result = super(User, self).to_dict(excluded=excluded, included=included)
+        if self.status == USER_STATUS_UNVERIFIED:
+            result['email_verification_token'] = self.activation.code
         return result
 
     def from_dict(self, dictionary):
@@ -167,7 +163,7 @@ class User(Base):
         email = dictionary.get('email', None)
         if email:
             dictionary['email'] = email.lower()
-        dictionary.setdefault('status', USER_STATUS_INACTIVE)
+        dictionary.setdefault('status', USER_STATUS_DISABLED)
         return super(User, self).from_dict(dictionary)
 
     @property

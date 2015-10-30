@@ -22,15 +22,14 @@ class Base(object):
 
     @classmethod
     def required(cls):
-        """Return a list of all columns required by the database to create the
-        resource.
+        """Return a list of all columns required by the database to create the resource.
 
         :param cls: The Model class to gather attributes from
         :rtype: list
         """
         columns = []
         for column in cls.__table__.columns:
-            if not column.nullable:
+            if not column.nullable and not column.primary_key:
                 columns.append(column.name)
         return columns
 
@@ -53,16 +52,22 @@ class Base(object):
         """
         return list(self.__table__.primary_key.columns)[0].name
 
-    def to_dict(self, excluded_columns=set(), included_columns=set()):
+    def to_dict(self, excluded=None, included=None, object_type=dict):
         """Return the resource as a dictionary.
+        Include all columns if include_columns is None or empty set
+        if a column name is specified in both excluded and included sets,
+        the column will get excluded.
 
         :rtype: dict
         """
-        columns = self.__table__.columns.keys()
-        if included_columns is None or len(included_columns) == 0:
-            included_columns = set(columns)
+        excluded = excluded or set()
+        included = included or set()
 
-        result = OrderedDict()
+        columns = self.__table__.columns.keys()
+        if len(included) == 0:
+            included = set(columns)
+
+        result = object_type()
         for col in columns:
             val = getattr(self, col, None)
             if type(val) is uuid.UUID:
@@ -72,7 +77,7 @@ class Base(object):
                 # val = val.isoformat()
                 val = val.strftime('%Y-%m-%dT%H:%M:%S.%f')
                 val = val[:-3] + 'Z'
-            if col in included_columns and col not in excluded_columns:
+            if col in included and col not in excluded:
                 result[col] = val
         return result
 
@@ -87,18 +92,12 @@ class Base(object):
             if val:
                 setattr(self, col, val)
 
-    def to_json(self, excluded_columns=set(), included_columns=set()):
-        # subclass could override to_dict with only 'excluded_columns' kv pair
-        if excluded_columns and included_columns:
-            dictionary = self.to_dict(excluded_columns=excluded_columns, included_columns=included_columns)
-        elif excluded_columns:
-            dictionary = self.to_dict(excluded_columns=excluded_columns)
-        elif included_columns:
-            dictionary = self.to_dict(included_columns=included_columns)
-        else:
-            dictionary = self.to_dict()
-        # return json.dumps(dictionary, cls=ModelJSONEncoder, encoding='utf-8')
-        return json.dumps(dictionary, encoding='utf-8')
+    def to_json(self, excluded=None, included=None, pretty=False, object_type=OrderedDict):
+        dictionary = self.to_dict(excluded=excluded, included=included, object_type=object_type)
+        obj = self.to_dict(OrderedDict)
+        if pretty:
+            return json.dumps(dictionary, indent=4, separators=(',', ': '), ensure_ascii=False)
+        return json.dumps(dictionary)
 
     def from_json(self, json_str):
         dictionary = json.loads(json_str, encoding='utf-8')
@@ -360,61 +359,59 @@ def jsonify(result, **kwargs):
     return json.dumps(result, encoding='utf-8', **kwargs)
 
 
-def generate_query(query, model,
-                   where=None, order_by=None, limit=None, offset=None, start=None, end=None):
-    if where:
-        query = add_where(query, model, where)
+def generate_query(model,
+                   filters=None, order_by=None, limit=None, offset=None, start=None, end=None):
+    """apply where/order_by/limit/offset to the ``Query`` based on a "
+    "range and return the newly resulting ``Query``."""
+
+    q = DBSession.query(model)
+    if filters:
+        q = apply_filters(q, model, filters)
     if order_by:
-        query = add_order_by(query, model, order_by)
+        q = apply_order_by(q, model, order_by)
     if limit:
-        query = query.limit(int(limit))
+        q = q.limit(int(limit))
     if offset:
-        query = query.offset(int(offset))
+        q = q.offset(int(offset))
     if start or end:
+        if start:
+            start = int(start)
+        if end:
+            end = int(end)
         # apply LIMIT/OFFSET to the ``Query`` based on a range
-        query = add_start_end(query, start, end)
+        q = q.slice(start, end)
 
-    return query
-
-
-def add_where(query, model, where):
-    if where:
-        if type(where) is list:
-            where = ','.join(where)
-        # todo: convert from Parse like quries to flask-restless like filter objects
-        searchparams = json.loads(where)
-        query = create_query(DBSession, model, searchparams)
-
-    return query
+    return q
 
 
-def add_order_by(query, model, order_by):
-    cols = []
-    if type(order_by) is str or type(order_by) is unicode:
-        if ',' in order_by:
-            cols = order_by.split(',')
+def apply_filters(q, model, filters):
+    if filters:
+        if type(filters) is list:
+            filters = ','.join(filters)
+        searchparams = json.loads(filters)
+        q = create_query(DBSession, model, searchparams)
+
+    return q
+
+
+def apply_order_by(q, model, order_by):
+    if order_by:
+        cols = []
+        if type(order_by) is str or type(order_by) is unicode:
+            if ',' in order_by:
+                cols = order_by.split(',')
+            else:
+                cols.append(order_by)
         else:
-            cols.append(order_by)
-    else:
-        cols = order_by
-    for order_by in cols:
-        if order_by.lower().endswith(' desc'):
-            query = query.order_by(desc(getattr(model, order_by.strip().split(' ')[0])))
-        elif order_by.lower().endswith(' asc'):
-            query = query.order_by(getattr(model, order_by.strip().split(' ')[0]))
-        else:
-            query = query.order_by(getattr(model, order_by))
+            cols = order_by
 
-    return query
+        for order_by in cols:
+            if order_by.lower().endswith(' desc'):
+                q = q.order_by(desc(getattr(model, order_by.strip().split(' ')[0])))
+            elif order_by.lower().endswith(' asc'):
+                q = q.order_by(getattr(model, order_by.strip().split(' ')[0]))
+            else:
+                q = q.order_by(getattr(model, order_by))
 
+    return q
 
-def add_start_end(query, start, end):
-    if start:
-        start = int(start)
-    if end:
-        end = int(end)
-    if start or end:
-        # apply LIMIT/OFFSET to the ``Query`` based on a range
-        query = query.slice(start, end)
-
-    return query

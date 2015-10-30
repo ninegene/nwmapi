@@ -1,6 +1,7 @@
 import logging
 
 import falcon
+from nwmapi.common import booleanize
 from nwmapi.hooks import require_path_param, validate_fields
 from nwmapi.httpstatus import HTTP404NotFound, HTTP501NotImplemented
 from nwmapi.models.user import User
@@ -10,13 +11,35 @@ from nwmapi.services.userservice import UserService
 log = logging.getLogger(__name__)
 
 
-# Method         HTTP method   URL
-# get_user_list()    GET           /users
-# create_user()      POST          /users
-# get_user()         GET           /users/<id>
-# update_user()      PATCH         /users/<id>
-# replace_user()     PUT           /users/<id>
-# delete_user()      DELETE        /users/<id>
+
+# HTTP method   URI Pattern                 Method
+# GET           /users                      get_user_list()
+# POST          /users                      create_user()
+# GET           /users/<id>                 get_user()
+# PUT           /users/<id>                 update_user()
+# DELETE        /users/<id>                 delete_user()
+
+# TODO
+
+# See: http://docs.aws.amazon.com/AmazonS3/latest/dev/RESTAuthentication.html
+# See: http://docs.stormpath.com/rest/product-guide/#account-resource
+# See: https://docs.strongloop.com/display/public/LB/User+REST+API
+
+# GET           /users/<id>/accessTokens    get_user_access_tokens()
+# POST          /users/<id>/accessTokens    create_user_access_tokens()
+# DELETE        /users/<id>/accessTokens    delete_user_access_tokens()
+# GET           /users/confirm              confirm_email()
+# GET           /users/count                user_count()
+# GET           /user/<id>/exists           user_exists()
+# POST          /users/login                login_user()
+# POST          /users/logout               logout_user()
+# POST          /users/reset                reset_password()
+
+# http://docs.stormpath.com/rest/product-guide/#verify-an-email-address
+# http://docs.stormpath.com/rest/product-guide/#application-account-authc
+# POST          /users/emailVerificationTokens/<token> confirm_email()
+# POST          /users/loginAttempts        login_user()
+# POST          /users/passwordResetTokens  reset_password()
 
 
 class UserListResource(BaseHandler):
@@ -40,11 +63,6 @@ class UserResource(BaseHandler):
         get_user(req, resp, id)
 
     @falcon.before(require_path_param('id'))
-    def on_patch(self, req, resp, id):
-        update_user(req, resp, id)
-
-    @falcon.before(require_path_param('id'))
-    @falcon.before(validate_fields(User))
     def on_put(self, req, resp, id):
         update_user(req, resp, id)
 
@@ -54,17 +72,18 @@ class UserResource(BaseHandler):
 
 
 def get_user_list(req, resp):
-    where = req.params.get('where', None)
+    filters = req.params.get('q', None)
     order_by = req.params.get('order_by', None)
     limit = req.params.get('limit', None)
     offset = req.params.get('offset', None)
     start = req.params.get('start', None)
     end = req.params.get('end', None)
+    single = req.params.get('single', None)
 
     service = UserService()
-    users = service.get_user_list(where=where,
-                                  order_by=order_by,
-                                  limit=limit, offset=offset, start=start, end=end)
+    users = service.get_user_list(filters=filters, order_by=order_by,
+                                  limit=limit, offset=offset, start=start, end=end,
+                                  single=single)
 
     resp.http200ok(result=users)
 
@@ -93,6 +112,9 @@ def update_user(req, resp, id):
 
     service = UserService()
     user = service.update_user(data, id=id)
+
+    if user is None:
+        raise HTTP404NotFound()
 
     resp.http200ok(result=user)
 
