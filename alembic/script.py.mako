@@ -14,6 +14,8 @@ depends_on = ${repr(depends_on)}
 
 from alembic import op
 import sqlalchemy as sa
+# see: https://alembic.readthedocs.org/en/latest/autogenerate.html#controlling-the-module-prefix
+import nwmapi.db
 ${imports if imports else ""}
 
 def upgrade():

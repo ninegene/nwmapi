@@ -40,8 +40,8 @@ class User(Base):
     __tablename__ = u'user'
 
     id = Column(GUID, default=ordered_uuid1, primary_key=True)
-    username = Column(CoerceUTF8(255), unique=True, nullable=False)
-    email = Column(String(255), unique=True, nullable=False)
+    username = Column(CoerceUTF8(255), unique=True)
+    email = Column(String(255), unique=True)
     _password = Column('password', CoerceUTF8(255))
     firstname = Column(CoerceUTF8(255))
     middlename = Column(CoerceUTF8(255))
