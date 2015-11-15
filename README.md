@@ -59,6 +59,32 @@ INFO  [alembic.autogenerate.compare] Detected removed column 'user.fullname'
 $ alembic upgrade head
 ```
 
+### Re-initialize db for sqlite
+Cannot drop column in sqlite. Use delete nwmdb-dev.sqlite and use initializedb.py
+```
+$ rm nwmdb-dev.sqlite
+$ initialize_nwmdb development.ini
+```
+
+### Install postgresql driver
+
+```
+$ sudo apt-get install python-dev libpq-dev
+$ pip install psycopg2
+```
+
+### Re-initialize db for postgresql
+Drop and create nwmdb
+```
+$ sudo -i -u postgres dropdb nwmdb
+ 
+$ sudo -i -u postgres createdb -O nwm nwmdb
+
+$ cd nwmapi
+$ source venv/bin/activate.fish 
+$ initialize_nwmdb development.ini
+```
+
 ### What does Autogenerate Detect (and what does it not detect?)
 The vast majority of user issues with Alembic centers on the topic of what kinds of changes autogenerate can and cannot detect reliably, as well as how it renders Python code for what it does detect. it is critical to note that autogenerate is not intended to be perfect. It is always necessary to manually review and correct the candidate migrations that autogenererate produces. The feature is getting more and more comprehensive and error-free as releases continue, but one should take note of the current limitations.
 

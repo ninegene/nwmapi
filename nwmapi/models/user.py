@@ -53,12 +53,14 @@ class User(Base):
     role = Column(
         Enum(USER_ROLE_CONSUMER,
              USER_ROLE_BUSINESS,
-             USER_ROLE_ADMIN),
+             USER_ROLE_ADMIN,
+             name = "user_role_enum"),
         default=USER_ROLE_CONSUMER)
     status = Column(
         Enum(USER_STATUS_ENABLED,
              USER_STATUS_DISABLED,
-             USER_STATUS_UNVERIFIED),
+             USER_STATUS_UNVERIFIED,
+             name = "user_status_enum"),
         default=USER_STATUS_UNVERIFIED)
     activation = relationship(
         'Activation',
