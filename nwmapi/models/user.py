@@ -6,6 +6,7 @@ import bcrypt
 from dateutil.tz import tzutc
 from nwmapi.db import GUID, Base, CoerceUTF8, UTCDateTime, ordered_uuid1, utcnow
 from sqlalchemy import Column, String, func, ForeignKey, Enum, UnicodeText
+from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import relationship, synonym
 
 log = logging.getLogger(__name__)
@@ -19,9 +20,9 @@ log = logging.getLogger(__name__)
 # http://docs.sqlalchemy.org/en/improve_toc/orm/backref.html
 # Introduction to SQLAlchemy - Pycon 2013 - https://www.youtube.com/watch?v=woKYyhLCcnU
 
-USER_ROLE_CONSUMER = 'consumer'
-USER_ROLE_BUSINESS = 'business'
-USER_ROLE_ADMIN = 'admin'
+USER_ROLE_CONSUMER = 'CONSUMER'
+USER_ROLE_BUSINESS = 'BUSINESS'
+USER_ROLE_ADMIN = 'ADMIN'
 
 USER_STATUS_ENABLED = 'ENABLED'
 USER_STATUS_DISABLED = 'DISABLED'
@@ -30,9 +31,8 @@ USER_STATUS_UNVERIFIED = 'UNVERIFIED'
 ACTIVATION_AGE = timedelta(days=3)
 NON_ACTIVATION_AGE = timedelta(days=30)
 
-SIGNUP_METHOD_INVITE = 'invite'
-SIGNUP_METHOD_SIGNUP = 'signup'
-SIGNUP_METHOD_TEST = 'test'
+CREATED_BY_INVITE = 'INVITE'
+CREATED_BY_SIGNUP = 'SIGNUP'
 
 
 # Based on Open-Source 'Bookie' python bookmark app
@@ -54,23 +54,25 @@ class User(Base):
         Enum(USER_ROLE_CONSUMER,
              USER_ROLE_BUSINESS,
              USER_ROLE_ADMIN,
-             name = "user_role_enum"),
+             name="user_role_enum"),
         default=USER_ROLE_CONSUMER)
     status = Column(
         Enum(USER_STATUS_ENABLED,
              USER_STATUS_DISABLED,
              USER_STATUS_UNVERIFIED,
-             name = "user_status_enum"),
+             name="user_status_enum"),
         default=USER_STATUS_UNVERIFIED)
-    activation = relationship(
-        'Activation',
-        cascade="all, delete, delete-orphan",
-        uselist=False,
-        backref='user',
-        lazy='joined')
-    custom_data = Column(UnicodeText)
-    created = Column(UTCDateTime, default=func.now(tz=tzutc()))
-    updated = Column(UTCDateTime, server_default=func.now(tz=tzutc()), onupdate=func.current_timestamp())
+    # activation = relationship(
+    #     'Activation',
+    #     cascade="all, delete, delete-orphan",
+    #     uselist=False,
+    #     backref='user',
+    #     lazy='joined')
+
+    custom_data = Column(JSON)
+    created_by = Column(CoerceUTF8(255), default=CREATED_BY_SIGNUP)
+    created_at = Column(UTCDateTime, default=func.now(tz=tzutc()))
+    updated_at = Column(UTCDateTime, server_default=func.now(tz=tzutc()), onupdate=func.current_timestamp())
 
     # groups = relationship(
     #     Group,
@@ -80,7 +82,7 @@ class User(Base):
 
     def __init__(self):
         """By default a user starts out deactivated"""
-        self.activation = Activation()
+        # self.activation = Activation()
         self.status = USER_STATUS_UNVERIFIED
 
     def _set_password(self, password):
@@ -156,8 +158,8 @@ class User(Base):
         excluded = excluded | {'password'}   # always exclude password
         included = included or set()
         result = super(User, self).to_dict(excluded=excluded, included=included)
-        if self.status == USER_STATUS_UNVERIFIED:
-            result['email_verification_token'] = self.activation.code
+        # if self.status == USER_STATUS_UNVERIFIED:
+        #     result['email_verification_token'] = self.activation.code
         return result
 
     def from_dict(self, dictionary):
@@ -165,7 +167,6 @@ class User(Base):
         email = dictionary.get('email', None)
         if email:
             dictionary['email'] = email.lower()
-        dictionary.setdefault('status', USER_STATUS_DISABLED)
         return super(User, self).from_dict(dictionary)
 
     @property
@@ -176,31 +177,31 @@ class User(Base):
         return "<User {} {} {} {}>".format(self.username, self.email, self.role, self.status)
 
 
-class Activation(Base):
-    """Handle activations/password reset items for users
-
-    The id is the user's id. Each user can only have one valid activation in
-    process at a time
-
-    The code should be a random hash that is valid only one time
-    After that hash is used to access the site it'll be removed
-
-    The created by is a system: new user registration, password reset, forgot
-    password, etc.
-
-    """
-    __tablename__ = u'activation'
-
-    user_id = Column(GUID, ForeignKey('user.id'), primary_key=True)
-    code = Column(CoerceUTF8(60))
-    valid_until = Column(UTCDateTime, default=lambda: utcnow() + ACTIVATION_AGE)
-    created_by = Column('created_by', CoerceUTF8(255))
-
-    def __init__(self, created_by=SIGNUP_METHOD_SIGNUP):
-        """Create a new activation"""
-        self.code = uuid.uuid4().hex
-        self.created_by = created_by
-        self.valid_until = utcnow() + ACTIVATION_AGE
+# class Activation(Base):
+#     """Handle activations/password reset items for users
+#
+#     The id is the user's id. Each user can only have one valid activation in
+#     process at a time
+#
+#     The code should be a random hash that is valid only one time
+#     After that hash is used to access the site it'll be removed
+#
+#     The created by is a system: new user registration, password reset, forgot
+#     password, etc.
+#
+#     """
+#     __tablename__ = u'activation'
+#
+#     user_id = Column(GUID, ForeignKey('user.id'), primary_key=True)
+#     code = Column(CoerceUTF8(60))
+#     valid_until = Column(UTCDateTime, default=lambda: utcnow() + ACTIVATION_AGE)
+#     created_by = Column('created_by', CoerceUTF8(255))
+#
+#     def __init__(self, created_by=CREATED_BY_SIGNUP):
+#         """Create a new activation"""
+#         self.code = uuid.uuid4().hex
+#         self.created_by = created_by
+#         self.valid_until = utcnow() + ACTIVATION_AGE
 
 # class Group(Base):
 #     __tablename__ = 'group'

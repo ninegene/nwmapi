@@ -48,6 +48,5 @@ def main(argv=sys.argv):
     print(user1.id, len(str(user1.id)), user1.id.hex, len(user1.id.hex))
     print(user2.id, len(str(user2.id)), user2.id.hex, len(user2.id.hex))
     print(user1.to_dict())
-    print(user1.activation)
 
     # u = session.query(User).filter(User.id == user.id).first()

@@ -6,7 +6,7 @@ from nwmapi.hooks import require_path_param, validate_fields
 from nwmapi.httpstatus import HTTP404NotFound, HTTP501NotImplemented
 from nwmapi.models.user import User
 from nwmapi.resources import BaseHandler
-from nwmapi.services.userservice import UserService
+from nwmapi.services import userservice
 
 log = logging.getLogger(__name__)
 
@@ -42,17 +42,29 @@ log = logging.getLogger(__name__)
 # POST          /users/passwordResetTokens  reset_password()
 
 
-class UserListResource(BaseHandler):
+class UsersResource(BaseHandler):
     #: The relative URL this resource should live at.
     __url__ = '/users'
 
     # @falcon.before(require_query_param('limit'))
     def on_get(self, req, resp):
-        get_user_list(req, resp)
+        filters = req.params.get('q', None)
+        order_by = req.params.get('order_by', None)
+        limit = req.params.get('limit', None)
+        offset = req.params.get('offset', None)
+        start = req.params.get('start', None)
+        end = req.params.get('end', None)
+
+        users = userservice.get_user_list(filters=filters, order_by=order_by,
+                                          limit=limit, offset=offset, start=start, end=end)
+
+        resp.http200ok(result=users)
+
 
     @falcon.before(validate_fields(User))
     def on_post(self, req, resp):
-        create_user(req, resp)
+        user = userservice.create_user(req.json_data)
+        resp.http201created(location='/users/%s' % user.id.hex, result=user)
 
 
 class UserResource(BaseHandler):
@@ -60,70 +72,29 @@ class UserResource(BaseHandler):
 
     @falcon.before(require_path_param('id'))
     def on_get(self, req, resp, id):
-        get_user(req, resp, id)
+        user = userservice.get_user(id=id)
+
+        if user is None:
+            raise HTTP404NotFound()
+
+        resp.http200ok(result=user)
+
 
     @falcon.before(require_path_param('id'))
     def on_put(self, req, resp, id):
-        update_user(req, resp, id)
+        user = userservice.update_user(req.json_data, id=id)
+
+        if user is None:
+            raise HTTP404NotFound()
+
+        resp.http200ok(result=user)
+
 
     @falcon.before(require_path_param('id'))
     def on_delete(self, req, resp, id):
-        delete_user(req, resp, id)
+        user = userservice.delete_user(id=id)
 
+        if user is None:
+            raise HTTP404NotFound()
 
-def get_user_list(req, resp):
-    filters = req.params.get('q', None)
-    order_by = req.params.get('order_by', None)
-    limit = req.params.get('limit', None)
-    offset = req.params.get('offset', None)
-    start = req.params.get('start', None)
-    end = req.params.get('end', None)
-    single = req.params.get('single', None)
-
-    service = UserService()
-    users = service.get_user_list(filters=filters, order_by=order_by,
-                                  limit=limit, offset=offset, start=start, end=end,
-                                  single=single)
-
-    resp.http200ok(result=users)
-
-
-def create_user(req, resp):
-    data = req.json_data
-
-    service = UserService()
-    user = service.create_user(data)
-
-    resp.http201created(location='/users/%s' % user.id.hex, result=user)
-
-
-def get_user(req, resp, id):
-    service = UserService()
-    user = service.get_user(id=id)
-
-    if user is None:
-        raise HTTP404NotFound()
-
-    resp.http200ok(result=user)
-
-
-def update_user(req, resp, id):
-    data = req.json_data
-
-    service = UserService()
-    user = service.update_user(data, id=id)
-
-    if user is None:
-        raise HTTP404NotFound()
-
-    resp.http200ok(result=user)
-
-
-def delete_user(req, resp, id):
-    service = UserService()
-    user = service.delete_user(id=id)
-
-    if user is None:
-        raise HTTP404NotFound()
-
-    resp.http204nocontent()
+        resp.http204nocontent()

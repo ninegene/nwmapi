@@ -4,7 +4,7 @@ from nwmapi.middleware import ReqRequireJSONType, ParseJSONReqBody, Request, Res
     DBSessionLifeCycle, SetCORSRespHeaders, ProcessCommonReqParams
 from nwmapi.db import Base, DBSession
 from nwmapi.resources.meta import MetaListResource
-from nwmapi.resources.users import UserResource, UserListResource
+from nwmapi.resources.users import UserResource, UsersResource
 from sqlalchemy import engine_from_config
 
 
@@ -81,7 +81,7 @@ def add_routes(app):
     app.add_route('/', UnknownUrl())
 
     app.add_route(MetaListResource.__url__, MetaListResource())
-    app.add_route(UserListResource.__url__, UserListResource())
+    app.add_route(UsersResource.__url__, UsersResource())
     app.add_route(UserResource.__url__, UserResource())
 
     # If a responder ever raised an instance of Exception, pass control to the given handler.
