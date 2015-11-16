@@ -6,9 +6,11 @@ falcon==0.3.0
 itsdangerous==0.24
 Mako==1.0.3
 MarkupSafe==0.23
+-e git+https://github.com/nawama/nwmapi.git@88b09ef2eb102292610bba393b0e521e5467dd5c#egg=nwmapi-master
 Paste==2.0.2
 PasteDeploy==1.5.2
 PasteScript==2.0.2
+psycopg2==2.6.1
 pycparser==2.14
 python-dateutil==2.4.2
 python-editor==0.4
