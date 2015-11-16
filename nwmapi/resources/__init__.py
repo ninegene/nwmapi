@@ -1,4 +1,5 @@
 import logging
+from nwmapi.httpstatus import HTTP501NotImplemented
 
 log = logging.getLogger(__name__)
 
@@ -36,3 +37,12 @@ class BaseHandler(object):
 
         resp.set_header('Allow', allowed)
         resp.http204nocontent()
+
+
+class RootResource(BaseHandler):
+    __url__ = '/'
+
+    def on_get(self, req, resp):
+        raise HTTP501NotImplemented()
+
+

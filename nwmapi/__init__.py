@@ -1,11 +1,16 @@
+import logging
 import falcon
-from nwmapi.errors import json_error_serializer, raise_unknown_url, UnknownUrl, handle_server_error
+from nwmapi.httpstatus import HTTP500InternalServerError, HTTP400BadRequest
 from nwmapi.middleware import ReqRequireJSONType, ParseJSONReqBody, Request, Response, \
     DBSessionLifeCycle, SetCORSRespHeaders, ProcessCommonReqParams
 from nwmapi.db import Base, DBSession
+from nwmapi.resources import RootResource
 from nwmapi.resources.meta import MetaListResource
 from nwmapi.resources.users import UserResource, UsersResource
 from sqlalchemy import engine_from_config
+
+
+log = logging.getLogger(__name__)
 
 
 def main(global_config, **settings):
@@ -78,11 +83,47 @@ def add_routes(app):
     #
 
     app.add_sink(raise_unknown_url)
-    app.add_route('/', UnknownUrl())
-
+    app.add_route(RootResource.__url__, RootResource())
     app.add_route(MetaListResource.__url__, MetaListResource())
     app.add_route(UsersResource.__url__, UsersResource())
     app.add_route(UserResource.__url__, UserResource())
 
     # If a responder ever raised an instance of Exception, pass control to the given handler.
     app.add_error_handler(Exception, handle_server_error)
+
+
+def json_error_serializer(req, exception):
+    """Override default serialize to always return json representation
+
+       Args:
+            req: The request object.
+
+        Returns:
+            A ``tuple`` of the form (*media_type*, *representation*), or (``None``, ``None``)
+            if the client does not support any of the available media types.
+    """
+    return 'application/json', exception.to_json()
+
+# A handler can either raise an instance of ``HTTPError``
+# or modify `resp` manually in order to communicate
+# information about the issue to the client.
+def handle_server_error(ex, req, resp, params):
+    log.exception(ex)
+    http_error = ex
+
+    if not isinstance(ex, falcon.HTTPError):
+        description = repr(ex)
+        # if hasattr(ex, 'asdict') and callable(ex.asdict):
+        #     description = repr(ex.asdict)
+
+        http_error = HTTP500InternalServerError(
+            title=repr(type(ex)),
+            description=description)
+
+    raise http_error
+
+
+def raise_unknown_url(req, resp):
+    raise HTTP400BadRequest(title='Invalid url',
+                            description='No route handler method defined for the url')
+

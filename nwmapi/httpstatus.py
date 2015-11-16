@@ -1,9 +1,9 @@
 import logging
-from falcon.status_codes import HTTP_404
 
 import falcon
 
 log = logging.getLogger(__name__)
+
 
 class HTTP400BadRequest(falcon.HTTPBadRequest):
     """400 Bad Request.
@@ -230,3 +230,43 @@ class HTTP503ServiceUnavailable(falcon.HTTPServiceUnavailable):
 
     def __init__(self, title, description, retry_after, **kwargs):
         super(HTTP503ServiceUnavailable, self).__init__(title, description, **kwargs)
+
+
+def _HTTPError_to_dict(self, obj_type=dict):
+    """Returns a basic dictionary representing the error.
+
+    This method can be useful when serializing the error to hash-like
+    media types, such as YAML, JSON, and MessagePack.
+
+    Args:
+        obj_type: A dict-like type that will be used to store the
+            error information (default ``dict``).
+
+    Returns:
+        A dictionary populated with the error's title, description, etc.
+
+    """
+
+    assert self.has_representation
+
+    obj = obj_type()
+
+    if self.status is not None:
+        obj['status'] = self.status
+
+    if self.title is not None:
+        obj['title'] = self.title
+
+    if self.description is not None:
+        obj['description'] = self.description
+
+    if self.code is not None:
+        obj['code'] = self.code
+
+    if self.link is not None:
+        obj['link'] = self.link
+
+    return obj
+
+# Monkey patch to_dict to include 'status' attribute
+falcon.HTTPError.to_dict = _HTTPError_to_dict
