@@ -1,4 +1,4 @@
-#!/home/aung/Projects/nwmapi/env/bin/python
+#/usr/bin/env python
 __requires__ = 'nwmapi==0.0'
 import sys
 from pkg_resources import load_entry_point

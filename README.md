@@ -1,28 +1,27 @@
+# bwmapi
 
-## Initial Setup
+## Getting Started
+
+### Mac
+
 ```
-# for bcrypt
-sudo apt-get install build-essential libffi-dev python-dev
+brew update
+brew install python3
 
+git clone https://github.com/nawama/nwmapi.git
 cd nwmapi
-virtualenv env
+
+pyvenv env
 source env/bin/activate.fish
-pip install cython
-pip install falcon
-pip install PasteDeploy
-pip install PasteScript
-pip install waitress
-pip install sqlalchemy
-pip install bcrypt
-pip install python-dateutil
-python setup develop
-bin/initialize_nwmdb development.ini
+
 ```
 
 ## Run
 ```
-$ source venv/bin/activate.fish
-$ paster serve development.ini --reload
+cd nwmapi
+source env/bin/activate.fish
+
+./run-server.sh development.ini
 ```
 
 
@@ -55,7 +54,7 @@ INFO  [alembic.autogenerate.compare] Detected NOT NULL on column 'user.email'
 INFO  [alembic.autogenerate.compare] Detected NOT NULL on column 'user.username'
 INFO  [alembic.autogenerate.compare] Detected removed column 'user.fullname'
   Generating /home/aung/Projects/nwmapi/alembic/versions/42949c3d5ac2_remove_user_fullname_and_add_firstname_.py ... done
-  
+
 $ alembic upgrade head
 ```
 
@@ -77,11 +76,11 @@ $ pip install psycopg2
 Drop and create nwmdb
 ```
 $ sudo -i -u postgres dropdb nwmdb
- 
+
 $ sudo -i -u postgres createdb -O nwm nwmdb
 
 $ cd nwmapi
-$ source venv/bin/activate.fish 
+$ source venv/bin/activate.fish
 $ initialize_nwmdb development.ini
 ```
 

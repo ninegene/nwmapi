@@ -1,4 +1,4 @@
-import ConfigParser as configparser
+import configparser
 import hashlib
 from logging.config import fileConfig
 import random
