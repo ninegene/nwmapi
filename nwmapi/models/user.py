@@ -4,7 +4,7 @@ import uuid
 
 import bcrypt
 from dateutil.tz import tzutc
-from nwmapi.db import GUID, Base, CoerceUTF8, UTCDateTime, ordered_uuid1, utcnow
+from nwmapi.db import GUID, Base, Unicode, UTCDateTime, ordered_uuid1, utcnow
 from sqlalchemy import Column, String, func, ForeignKey, Enum, UnicodeText
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import relationship, synonym
@@ -40,15 +40,15 @@ class User(Base):
     __tablename__ = u'user'
 
     id = Column(GUID, default=ordered_uuid1, primary_key=True)
-    username = Column(CoerceUTF8(255), unique=True)
+    username = Column(Unicode(255), unique=True)
     email = Column(String(255), unique=True)
-    _password = Column('password', CoerceUTF8(255))
-    firstname = Column(CoerceUTF8(255))
-    middlename = Column(CoerceUTF8(255))
-    lastname = Column(CoerceUTF8(255))
-    about_me = Column(CoerceUTF8)
+    _password = Column('password', Unicode(255))
+    firstname = Column(Unicode(255))
+    middlename = Column(Unicode(255))
+    lastname = Column(Unicode(255))
+    about_me = Column(Unicode)
     phone = Column(String)
-    location = Column(CoerceUTF8(255))
+    location = Column(Unicode(255))
     avatar_hash = Column(String(32))
     role = Column(
         Enum(USER_ROLE_CONSUMER,
@@ -70,7 +70,7 @@ class User(Base):
     #     lazy='joined')
 
     custom_data = Column(JSON)
-    created_by = Column(CoerceUTF8(255), default=CREATED_BY_SIGNUP)
+    created_by = Column(Unicode(255), default=CREATED_BY_SIGNUP)
     created_at = Column(UTCDateTime, default=func.now(tz=tzutc()))
     updated_at = Column(UTCDateTime, server_default=func.now(tz=tzutc()), onupdate=func.current_timestamp())
 
@@ -89,10 +89,11 @@ class User(Base):
         """Hash password on the fly."""
         # hashed_password = password
 
-        if isinstance(password, unicode):
-            pw = password.encode('UTF-8')
-        else:
-            pw = password
+        pw = password
+        # if isinstance(password, unicode):
+        #     pw = password.encode('UTF-8')
+        # else:
+        #     pw = password
 
         # Hash a password for the first time, with a randomly-generated salt
         salt = bcrypt.gensalt(10)
@@ -100,8 +101,8 @@ class User(Base):
 
         # Make sure the hased password is an UTF-8 object at the end of the
         # process because SQLAlchemy _wants_ a unicode object for Unicode fields
-        if not isinstance(hashed_password, unicode):
-            hashed_password = hashed_password.decode('UTF-8')
+        # if not isinstance(hashed_password, unicode):
+        #     hashed_password = hashed_password.decode('UTF-8')
 
         self._password = hashed_password
 
@@ -193,9 +194,9 @@ class User(Base):
 #     __tablename__ = u'activation'
 #
 #     user_id = Column(GUID, ForeignKey('user.id'), primary_key=True)
-#     code = Column(CoerceUTF8(60))
+#     code = Column(Unicode(60))
 #     valid_until = Column(UTCDateTime, default=lambda: utcnow() + ACTIVATION_AGE)
-#     created_by = Column('created_by', CoerceUTF8(255))
+#     created_by = Column('created_by', Unicode(255))
 #
 #     def __init__(self, created_by=CREATED_BY_SIGNUP):
 #         """Create a new activation"""
@@ -207,8 +208,8 @@ class User(Base):
 #     __tablename__ = 'group'
 #
 #     id = Column(GUID, primary_key=True)
-#     name = Column(CoerceUTF8(64), unique=True)
-#     description = Column(CoerceUTF8(255))
+#     name = Column(Unicode(64), unique=True)
+#     description = Column(Unicode(255))
 #     users = relationship(
 #         User,
 #         secondary='user_group',

@@ -87,7 +87,7 @@ class Base(object):
             val = dictionary.get(col, None)
             coltype = self.__table__.columns._data[col].type
             valtype = type(val)
-            if (valtype is str or valtype is unicode) and (coltype is DateTime or coltype is UTCDateTime):
+            if (valtype is str) and (coltype is DateTime or coltype is UTCDateTime):
                 val = dateutil.parser.parse(val)
             if val:
                 setattr(self, col, val)
@@ -173,16 +173,16 @@ DBSession = scoped_session(sessionmaker(
 
 
 # Based on: http://docs.sqlalchemy.org/en/rel_1_0/core/custom_types.html#typedecorator-recipes
-class CoerceUTF8(TypeDecorator):
-    """Safely coerce Python bytestrings to Unicode
-    before passing off to the database."""
-
-    impl = Unicode
-
-    def process_bind_param(self, value, dialect):
-        if isinstance(value, str):
-            value = value.decode('utf-8')
-        return value
+# class CoerceUTF8(TypeDecorator):
+#     """Safely coerce Python bytestrings to Unicode
+#     before passing off to the database."""
+#
+#     impl = Unicode
+#
+#     def process_bind_param(self, value, dialect):
+#         if isinstance(value, str):
+#             value = value.decode('utf-8')
+#         return value
 
 
 class GUID(TypeDecorator):
@@ -238,13 +238,13 @@ class UTCDateTime(TypeDecorator):
     impl = DateTime
 
     def process_bind_param(self, value, engine):
-        if type(value) is unicode or type(value) is str:
+        if type(value) is str:
             value = dateutil.parser.parse(value)
         if value is not None:
             return value.astimezone(tzutc())
 
     def process_result_value(self, value, engine):
-        if type(value) is unicode or type(value) is str:
+        if type(value) is str:
             value = dateutil.parser.parse(value)
         if value is not None:
             return datetime(value.year, value.month, value.day,
@@ -397,7 +397,7 @@ def apply_filters(q, model, filters):
 def apply_order_by(q, model, order_by):
     if order_by:
         cols = []
-        if type(order_by) is str or type(order_by) is unicode:
+        if type(order_by) is str:
             if ',' in order_by:
                 cols = order_by.split(',')
             else:

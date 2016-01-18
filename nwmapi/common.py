@@ -81,7 +81,7 @@ def get_appsettings(config_uri, name=None, options=None, appconfig=appconfig):
 
 def get_random_alphanumeric(size):
     word = ''
-    for i in xrange(size):
+    for i in range(size):
         word += random.choice(('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'))
     return word
 
@@ -92,11 +92,11 @@ def gen_random_hash(size=32):
 
     m = hashlib.sha256()
     m.update(get_random_alphanumeric(size))
-    return unicode(m.hexdigest()[:size])
+    return m.hexdigest()[:size]
 
 
 def booleanize(val):
-    if type(val) is str or type(val) is unicode:
+    if type(val) is str:
         val = val.lower()
         if val in ('y', 'yes', 'true', 'on', '1'):
             return True
