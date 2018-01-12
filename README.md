@@ -1,4 +1,4 @@
-# bwmapi
+# nwmapi
 
 ## Getting Started
 
